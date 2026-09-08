@@ -126,7 +126,13 @@ int main(void)
   MX_FATFS_Init();
   MX_OCTOSPI1_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_FDCAN_ActivateNotification(&hfdcan1,
+    FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_ERROR_WARNING | FDCAN_IT_BUS_OFF,
+    0);
+  
+  HAL_FDCAN_ActivateNotification(&hfdcan2,
+    FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_ERROR_WARNING | FDCAN_IT_BUS_OFF,
+    0);
   /* USER CODE END 2 */
 
   /* Init scheduler */
