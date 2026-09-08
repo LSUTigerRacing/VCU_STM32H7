@@ -16,12 +16,34 @@
   *
   ******************************************************************************
   */
+
+  //CAN0 -> Critical Powertrain functionality CAN1 -> Sensor data
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "fdcan.h"
 
 /* USER CODE BEGIN 0 */
 
+/* Extern Variables ------------------------------------------------------------------*/
+
+/* End of Extern Variables ------------------------------------------------------------------*/
+
+/* Extern Functions ------------------------------------------------------------------*/
+
+/*End of Extern Functions ------------------------------------------------------------------*/
+
+/* Private Variables ------------------------------------------------------------------*/
+static uint8_t fdcan0_busy;
+static uint8_t fdcan1_busy;
+/* End of Private Variables ------------------------------------------------------------------*/
+
+/* Private Functions ------------------------------------------------------------------*/
+
+/* End of Private Functions ------------------------------------------------------------------*/
+
+/* Local Variables  ------------------------------------------------------------------*/
+
+/* End of Local Variables ------------------------------------------------------------------*/
 /* USER CODE END 0 */
 
 FDCAN_HandleTypeDef hfdcan1;
@@ -56,9 +78,9 @@ void MX_FDCAN1_Init(void)
   hfdcan1.Init.MessageRAMOffset = 0;
   hfdcan1.Init.StdFiltersNbr = 0;
   hfdcan1.Init.ExtFiltersNbr = 0;
-  hfdcan1.Init.RxFifo0ElmtsNbr = 0;
+  hfdcan1.Init.RxFifo0ElmtsNbr = 16;
   hfdcan1.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
-  hfdcan1.Init.RxFifo1ElmtsNbr = 0;
+  hfdcan1.Init.RxFifo1ElmtsNbr = 32;
   hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.RxBuffersNbr = 0;
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
@@ -104,9 +126,9 @@ void MX_FDCAN2_Init(void)
   hfdcan2.Init.MessageRAMOffset = 0;
   hfdcan2.Init.StdFiltersNbr = 0;
   hfdcan2.Init.ExtFiltersNbr = 0;
-  hfdcan2.Init.RxFifo0ElmtsNbr = 0;
+  hfdcan2.Init.RxFifo0ElmtsNbr = 32;
   hfdcan2.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
-  hfdcan2.Init.RxFifo1ElmtsNbr = 0;
+  hfdcan2.Init.RxFifo1ElmtsNbr = 32;
   hfdcan2.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_8;
   hfdcan2.Init.RxBuffersNbr = 0;
   hfdcan2.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
@@ -213,6 +235,9 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* fdcanHandle)
     GPIO_InitStruct.Alternate = GPIO_AF9_FDCAN1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+    /* FDCAN1 interrupt Init */
+    HAL_NVIC_SetPriority(FDCAN1_IT0_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(FDCAN1_IT0_IRQn);
   /* USER CODE BEGIN FDCAN1_MspInit 1 */
 
   /* USER CODE END FDCAN1_MspInit 1 */
@@ -250,6 +275,9 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* fdcanHandle)
     GPIO_InitStruct.Alternate = GPIO_AF9_FDCAN2;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+    /* FDCAN2 interrupt Init */
+    HAL_NVIC_SetPriority(FDCAN2_IT0_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(FDCAN2_IT0_IRQn);
   /* USER CODE BEGIN FDCAN2_MspInit 1 */
 
   /* USER CODE END FDCAN2_MspInit 1 */
@@ -313,6 +341,8 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* fdcanHandle)
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_11|GPIO_PIN_12);
 
+    /* FDCAN1 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(FDCAN1_IT0_IRQn);
   /* USER CODE BEGIN FDCAN1_MspDeInit 1 */
 
   /* USER CODE END FDCAN1_MspDeInit 1 */
@@ -334,6 +364,8 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* fdcanHandle)
     */
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_12|GPIO_PIN_13);
 
+    /* FDCAN2 interrupt Deinit */
+    HAL_NVIC_DisableIRQ(FDCAN2_IT0_IRQn);
   /* USER CODE BEGIN FDCAN2_MspDeInit 1 */
 
   /* USER CODE END FDCAN2_MspDeInit 1 */
@@ -363,5 +395,117 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* fdcanHandle)
 
 /* USER CODE BEGIN 1 */
 
+/// @brief Adds data to be sent over CAN0 
+/// @param data The data that wants to be sent over
+void FDCAN0_Tx(uint8_t *data, uint32_t id){
+  HAL_StatusTypeDef status;
+  FDCAN_TxHeaderTypeDef header;
+  header.Identifier = id;
+  header.TxFrameType         = FDCAN_DATA_FRAME;
+  header.DataLength          = FDCAN_DLC_BYTES_8;
+  header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  header.BitRateSwitch       = FDCAN_BRS_OFF;       // OFF if you're not using CAN FD bit-rate switching
+  header.FDFormat            = FDCAN_CLASSIC_CAN;   // or FDCAN_FD_CAN if using FD frames
+  header.TxEventFifoControl  = FDCAN_NO_TX_EVENTS;  // unless you're using the Tx event FIFO
+  header.MessageMarker       = 0;                   // only matters if using Tx event FIFO
+
+  status = HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1,&header,data); 
+
+  switch(status){
+    case HAL_OK:
+
+    break;
+
+    case HAL_BUSY:
+    fdcan0_busy++;
+    break;
+
+    default:
+    Error_Handler();
+    break;
+  }
+}
+
+/// @brief Retrieves data from CAN0 rx buffer
+/// @return Returns data from CAN0 Rx buffer
+uint8_t* FDCAN0_Rx(void){
+  HAL_StatusTypeDef status;
+  uint8_t* ret;
+  FDCAN_RxHeaderTypeDef header;
+
+  status = HAL_FDCAN_GetRxMessage(&hfdcan1,FDCAN_RX_FIFO0,&header,ret);
+  
+  switch(status){
+    case HAL_OK:
+    break;
+
+    case HAL_BUSY:
+    fdcan0_busy++;
+    break;
+
+    default:
+    ret = 0;
+    Error_Hanlder();
+    break;
+  }
+
+  return ret;
+}
+/// @brief Retrieves the data from the CAN1 rx buffer
+/// @return Retrieves the data
+uint8_t* FDCAN1_Rx(void){
+  HAL_StatusTypeDef status;
+  uint8_t* ret;
+  FDCAN_RxHeaderTypeDef header;
+
+  status = HAL_FDCAN_GetRxMessage(&hfdcan2,FDCAN_RX_FIFO1,&header,ret);
+  
+  switch(status){
+    case HAL_OK:
+    break;
+
+    case HAL_BUSY:
+    fdcan1_busy++;
+    break;
+
+    default:
+    ret = 0;
+    Error_Handler();
+    break;
+  }
+
+  return ret;
+}
+
+/// @brief Adds data to the CAN1 transmit buffer
+/// @param data 
+void FDCAN1_Tx(uint8_t *data, uint32_t id){
+  HAL_StatusTypeDef status;
+  FDCAN_TxHeaderTypeDef header;
+  header.Identifier = id;
+  header.TxFrameType         = FDCAN_DATA_FRAME;
+  header.DataLength          = FDCAN_DLC_BYTES_8;
+  header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  header.BitRateSwitch       = FDCAN_BRS_OFF;       // OFF if you're not using CAN FD bit-rate switching
+  header.FDFormat            = FDCAN_CLASSIC_CAN;   // or FDCAN_FD_CAN if using FD frames
+  header.TxEventFifoControl  = FDCAN_NO_TX_EVENTS;  // unless you're using the Tx event FIFO
+  header.MessageMarker       = 0;                   // only matters if using Tx event FIFO
+
+  status = HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1,&header,data); 
+
+  switch(status){
+    case HAL_OK:
+
+    break;
+
+    case HAL_BUSY:
+    fdcan1_busy++;
+    break;
+
+    default:
+    Error_Handler();
+    break;
+  }
+}
 /* USER CODE END 1 */
 
