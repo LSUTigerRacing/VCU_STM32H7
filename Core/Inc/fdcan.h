@@ -47,12 +47,6 @@ void MX_FDCAN2_Init(void);
 void MX_FDCAN3_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-
-void FDCAN0_Tx(uint8_t *data, uint32_t id);
-uint8_t* FDCAN0_Rx(void);
-void FDCAN1_Tx(uint8_t *data, uint32_t id);
-uint8_t* FDCAN1_RX(void);
-
 typedef struct{
   uint8_t buffer[BUFFERSIZE];
   uint8_t head;
