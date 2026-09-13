@@ -26,6 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "adc.h"
 
 /* USER CODE END Includes */
 
@@ -36,7 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define D2_RAM __attribute__((section(".D2_RAM")))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,6 +47,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+extern TIM_HandleTypeDef htim1;
+extern ADC_HandleTypeDef hadc1;
+
+volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
+volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -144,10 +150,14 @@ void StartDefaultTask(void *argument)
 void StartADCTask(void *argument)
 {
   /* USER CODE BEGIN StartADCTask */
+  HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, 1); // Change the 1 to ADC12_BUFFER_COUNT when those buffers are used
+  HAL_TIM_Base_Start(&htim1);
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    pot_reading[2] = (pot_reading[0] + pot_reading[1]) / 2;
   }
   /* USER CODE END StartADCTask */
 }
