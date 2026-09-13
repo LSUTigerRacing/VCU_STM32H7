@@ -32,6 +32,9 @@
 #define BYTE5 40
 #define BYTE6 48
 #define BYTE7 56
+#define SIGNED BIT0
+#define BIG_ENDIAN BIT1
+
 /* End of defines ------------------------------------------------------------------*/
 
 /* Extern Variables ------------------------------------------------------------------*/
@@ -39,7 +42,7 @@
 /* End of Extern Variables ------------------------------------------------------------------*/
 
 /* Extern Functions ------------------------------------------------------------------*/
-
+extern uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size);
 /*End of Extern Functions ------------------------------------------------------------------*/
 
 /* Private Variables ------------------------------------------------------------------*/
@@ -48,32 +51,36 @@ static uint8_t fdcan1_busy;
 /* End of Private Variables ------------------------------------------------------------------*/
 
 /* Private Functions ------------------------------------------------------------------*/
-static void Assign_Signal(CAN_Msg *msg);
 
 /* End of Private Functions ------------------------------------------------------------------*/
 
 /* Global Variables  ------------------------------------------------------------------*/
 typedef struct{
-  uint8_t id;
-  uint8_t dlc;
-  uint64_t data;
-  CAN_Signal *signal;
-} CAN_Msg;
-
-typedef struct{
   uint8_t start_bit;
   uint8_t end_bit;
-  uint32_t size;
   float scale;
   int16_t offset;
   float min;
   float max;
+  uint8_t signed_endian;
+  float decoded;
 }CAN_Signal;
+
+typedef struct{
+  uint16_t id;
+  uint8_t dlc;
+  uint64_t data;
+  CAN_Signal *signal;
+  uint8_t sig_count;
+} CAN_Msg;
+
 /* End of Global Variables ------------------------------------------------------------------*/
 
 /* Global Functions  ------------------------------------------------------------------*/
 CAN_Msg Prepare_Message(uint32_t id, uint8_t *data, uint8_t dlc);
 void Decode_Message(CAN_Msg *msg);
+
+static void Assign_Signal(CAN_Msg *msg);
 /* End of Global Functions ------------------------------------------------------------------*/
 /* USER CODE END 0 */
 
@@ -433,6 +440,95 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* fdcanHandle)
 
 /* USER CODE BEGIN 1 */
 
+/// @brief Preparing a message that is about to be sent
+/// @param id CAN id
+/// @param data CAN data
+/// @return Prepared CAN message
+CAN_Msg Prepare_Message(uint32_t id, uint8_t *data, uint8_t dlc){
+  CAN_Msg ret;
+  uint64_t data_convert;
+
+  for(uint8_t i =0; i < 8; i++){
+      data_convert |= (uint64_t)data[i] << (8 * i);
+    }
+
+  ret.id = id;
+  ret.dlc = dlc;
+  ret.data = data_convert;
+
+  return ret;
+}
+
+/// @brief Should be when message is recieved and 
+/// @param msg Pointer to CAN message
+void Assign_Signal(CAN_Msg *msg){
+    
+    switch(msg->id){
+      case 10:
+      //implement actual dbc definition
+      CAN_Signal sig[] = {
+        {.start_bit = 0, .end_bit = 7, .min = 0, .max = 88, .offset = 0.5, .scale = 0.75, .signed_endian = 0}
+      };
+      msg->signal = sig;
+      msg->sig_count = sizeof(sig)/sizeof(sig[0]);
+      break;
+
+      default:
+      msg->id = 999; //dbc message not tracked
+    }
+}
+
+/// @brief Decodes CAN messages based on .dbc files
+/// @param msg utilized to decode message
+void Decode_Message(CAN_Msg *msg){
+  if(msg->id == 999){
+    return; //error case
+  }
+
+  uint64_t translated_data;
+  
+  translated_data = msg->data;
+  
+  for(uint8_t i =0; i < msg->sig_count;i++ ){
+    //Signed + Big Endian
+    if(msg->signal->signed_endian & SIGNED && msg->signal->signed_endian & BIG_ENDIAN){
+      //worry about if there are big endian sigs
+    } 
+    //Signed + Little Endian
+    else if(msg->signal->signed_endian & SIGNED && !(msg->signal->signed_endian & BIG_ENDIAN)){
+      
+    }   
+    //Unsigned + Big Endian
+    else if(!(msg->signal->signed_endian & SIGNED) && msg->signal->signed_endian & BIG_ENDIAN){
+      //worry about if there are big endian sigs
+    } 
+    //Unsigned + Little Endian
+    else if(!(msg->signal->signed_endian & SIGNED) && !(msg->signal->signed_endian & BIG_ENDIAN)){
+      float decode;
+
+      decode = (float)extract_bits(translated_data, msg->signal->start_bit, msg->signal->end_bit - msg->signal->start_bit);
+      decode = decode + msg->signal->offset;
+      decode = decode * msg->signal->scale;
+
+      if(decode > msg->signal->max){
+        decode = msg->signal->max;
+      }
+      else if(decode < msg->signal->min){
+        decode = msg->signal->min;
+      }
+      msg->signal->decoded = decode;
+    }
+    ++msg->signal; 
+  }
+
+}
+
+/// @brief Adds messages to CAN2 FIFO
+/// @param hfdcan pointer to can
+void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan){
+
+}
+
 /// @brief Adds data to be sent over CAN0 
 /// @param data The data that wants to be sent over
 void FDCAN0_Tx(uint8_t *data, uint32_t id){
@@ -471,18 +567,23 @@ void FDCAN0_Tx(uint8_t *data, uint32_t id){
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs){
   if(RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE){
     HAL_StatusTypeDef status;
-    uint8_t* data;
+    uint8_t data[8];
     FDCAN_RxHeaderTypeDef header;
     
-    status = HAL_FDCAN_GetRxMessage(&hfdcan,FDCAN_RX_FIFO0,&header, data);
+    status = HAL_FDCAN_GetRxMessage(hfdcan,FDCAN_RX_FIFO0,&header, data);
 
     switch(status){
       case HAL_OK:
       CAN_Msg recieved;
+      recieved.data = 0;
+
       recieved.id = header.Identifier;
       recieved.dlc = header.DataLength;
-      recieved.data |= data[7] << BYTE7 | data[6] << BYTE6 | data[5] << BYTE5 | 
-      data[4] << BYTE4 | data[3] << BYTE3 | data[2] << BYTE2 | data[1] << BYTE1 | data[0];
+
+      for(uint8_t i =0; i < 8; i++){
+        recieved.data |= (uint64_t)data[i] << (8 * i);
+      }
+
       Assign_Signal(&recieved);
       break;
 
@@ -503,14 +604,24 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs){
   if(RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE){
     HAL_StatusTypeDef status;  
-    uint8_t* data;
+    uint8_t data[8];
     FDCAN_RxHeaderTypeDef header;
 
-    status = HAL_FDCAN_GetRxMessage(&hfdcan,FDCAN_RX_FIFO1,&header, data);
+    status = HAL_FDCAN_GetRxMessage(hfdcan,FDCAN_RX_FIFO1,&header, data);
 
     switch(status){
       case HAL_OK:
-      Encode_Message(&header,&data);
+      CAN_Msg recieved;
+      recieved.data = 0;
+
+      recieved.id = header.Identifier;
+      recieved.dlc = header.DataLength;
+
+      for(uint8_t i =0; i < 8; i++){
+        recieved.data |= (uint64_t)data[i] << (8 * i);
+      }
+      
+      Assign_Signal(&recieved);
       break;
 
       case HAL_BUSY:
@@ -524,61 +635,13 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
   }
 }
 
-/// @brief Decodes CAN messages based on .dbc files
-/// @param msg utilized to decode message
-void Decode_Message(CAN_Msg *msg){
-  if(msg->id == 999){
-    return; //error case
-  }
-
-  
-}
-
-/// @brief Adds messages to CAN2 FIFO
-/// @param hfdcan pointer to can
-void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan){
-
-}
-
-/// @brief Preparing a message that is about to be sent
-/// @param id CAN id
-/// @param data CAN data
-/// @return Prepared CAN message
-CAN_Msg Prepare_Message(uint32_t id, uint8_t *data, uint8_t dlc){
-  CAN_Msg ret;
-  ret.id = id;
-  ret.dlc = dlc;
-  ret.data = &data[0];
-
-  return ret;
-}
-
-/// @brief 
+/// @brief Used for CAN1 bus transmissions with queue mode
 /// @param hfdcan 
 /// @param BufferIndexes 
 void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes){
   
 }
 
-/// @brief Should be when message is recieved and 
-/// @param msg Pointer to CAN message
-void Assign_Signal(CAN_Msg *msg){
-  CAN_Signal sig;
-  switch(msg->id){
-    case 10:
-    //implement actual dbc definition
-    sig.start_bit = 0;
-    sig.end_bit = 7;
-    sig.offset = .5;
-    sig.scale = .25;
-    sig.max = 220;
-    sig.min = 10;
-    msg->signal = &sig;
-    break;
 
-    default:
-    msg->id = 999; //dbc message not tracked
-  }
-}
 /* USER CODE END 1 */
 

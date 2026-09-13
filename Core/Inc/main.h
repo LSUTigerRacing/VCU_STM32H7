@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size);
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -91,7 +91,14 @@ void Error_Handler(void);
 #define DigIn_1_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
-
+#define BIT0 (1ULL << 0)
+#define BIT1 (1ULL << 1)
+#define BIT2 (1ULL << 2)
+#define BIT3 (1ULL << 3)
+#define BIT4 (1ULL << 4)
+#define BIT5 (1ULL << 5)
+#define BIT6 (1ULL << 6)
+#define BIT7 (1ULL << 7)
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
