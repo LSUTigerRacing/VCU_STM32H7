@@ -34,6 +34,11 @@
 #define BYTE7 56
 #define SIGNED BIT0
 #define BIG_ENDIAN BIT1
+#define TYPE_INT8 BIT2
+#define TYPE_INT16 BIT3
+#define TYPE_INT24 BIT4
+#define TYPE_INT32 BIT5
+#define TYPE_FLOAT BIT6
 
 /* End of defines ------------------------------------------------------------------*/
 
@@ -55,6 +60,18 @@ static uint8_t fdcan1_busy;
 /* End of Private Functions ------------------------------------------------------------------*/
 
 /* Global Variables  ------------------------------------------------------------------*/
+typedef union{
+  uint8_t uint8;
+  int8_t int8;
+  uint16_t uint16;
+  int16_t int16;
+  uint32_t uint24; //non standard type
+  int32_t int24; //non standard type
+  uint32_t uint32;
+  int32_t int32;
+  float flt;
+}CAN_decoded_values;
+
 typedef struct{
   uint8_t start_bit;
   uint8_t end_bit;
@@ -62,8 +79,8 @@ typedef struct{
   int16_t offset;
   float min;
   float max;
-  uint8_t signed_endian;
-  float decoded;
+  uint8_t type;
+  CAN_decoded_values decoded;
 }CAN_Signal;
 
 typedef struct{
@@ -459,7 +476,7 @@ CAN_Msg Prepare_Message(uint32_t id, uint8_t *data, uint8_t dlc){
   return ret;
 }
 
-/// @brief Should be when message is recieved and 
+/// @brief Assigns signals to the message and should be called after recieving message 
 /// @param msg Pointer to CAN message
 void Assign_Signal(CAN_Msg *msg){
     
@@ -467,7 +484,7 @@ void Assign_Signal(CAN_Msg *msg){
       case 10:
       //implement actual dbc definition
       CAN_Signal sig[] = {
-        {.start_bit = 0, .end_bit = 7, .min = 0, .max = 88, .offset = 0.5, .scale = 0.75, .signed_endian = 0}
+        {.start_bit = 0, .end_bit = 7, .min = 0, .max = 88, .offset = 0.5, .scale = 0.75, .type = 0}
       };
       msg->signal = sig;
       msg->sig_count = sizeof(sig)/sizeof(sig[0]);
@@ -490,35 +507,95 @@ void Decode_Message(CAN_Msg *msg){
   translated_data = msg->data;
   
   for(uint8_t i =0; i < msg->sig_count;i++ ){
+    CAN_Signal *sig = &msg->signal[i];
+    uint8_t size;
+
+    size = sig->end_bit - sig->start_bit + 1;
     //Signed + Big Endian
-    if(msg->signal->signed_endian & SIGNED && msg->signal->signed_endian & BIG_ENDIAN){
+    if(sig->type & SIGNED && sig->type & BIG_ENDIAN){
       //worry about if there are big endian sigs
     } 
     //Signed + Little Endian
-    else if(msg->signal->signed_endian & SIGNED && !(msg->signal->signed_endian & BIG_ENDIAN)){
-      
+    else if(sig->type & SIGNED && !(sig->type & BIG_ENDIAN)){
+      uint64_t raw;
+      int64_t signed_raw;
+
+      raw = extract_bits(translated_data, sig->start_bit, size);
+      signed_raw = (int64_t) raw;
+      if(raw & (1ULL << size -1)){
+        signed_raw -= (1ULL << size);
+      }
+
+      if(sig->type & TYPE_FLOAT){
+        float decode;
+
+        decode = (float)signed_raw;
+        decode *= sig->scale;
+        decode += sig->offset;
+
+        sig->decoded.flt = decode;
+      }
+      else{
+        signed_raw *= sig->scale;
+        signed_raw += sig->offset;
+
+        if(sig->type & TYPE_INT8){
+          sig->decoded.int8 = (int8_t) signed_raw;
+        }
+        else if(sig->type & TYPE_INT16){
+          sig->decoded.int16 = (int16_t) signed_raw;
+        }
+        else if(sig->type & TYPE_INT24){
+          sig->decoded.int24 = (int32_t) signed_raw;
+        }
+        else if(sig->type & TYPE_INT32){
+          sig->decoded.int32 = (int32_t) signed_raw;
+}
+      }
     }   
     //Unsigned + Big Endian
-    else if(!(msg->signal->signed_endian & SIGNED) && msg->signal->signed_endian & BIG_ENDIAN){
+    else if(!(sig->type & SIGNED) && sig->type & BIG_ENDIAN){
       //worry about if there are big endian sigs
     } 
     //Unsigned + Little Endian
-    else if(!(msg->signal->signed_endian & SIGNED) && !(msg->signal->signed_endian & BIG_ENDIAN)){
-      float decode;
+    else if(!(sig->type & SIGNED) && !(sig->type & BIG_ENDIAN)){
+      if(sig->type & TYPE_FLOAT){
+        float decode;
 
-      decode = (float)extract_bits(translated_data, msg->signal->start_bit, msg->signal->end_bit - msg->signal->start_bit);
-      decode = decode + msg->signal->offset;
-      decode = decode * msg->signal->scale;
+        decode = (float)extract_bits(translated_data,sig->start_bit,size);
+        decode *= sig->scale;
+        decode += sig->offset;
 
-      if(decode > msg->signal->max){
-        decode = msg->signal->max;
+        sig->decoded.flt = decode;
       }
-      else if(decode < msg->signal->min){
-        decode = msg->signal->min;
+      else{
+        uint64_t decode;
+
+        decode = extract_bits(translated_data, sig->start_bit, size);
+        decode *= sig->scale;
+        decode += sig->offset;
+
+        if(decode > sig->max){
+          decode = sig->max;
+        }
+        else if(decode < sig->min){
+          decode = sig->min;
+        }
+
+        if(sig->type & TYPE_INT8){
+          sig->decoded.uint8 = (uint8_t) decode;
+        }
+        else if(sig->type & TYPE_INT16){
+          sig->decoded.uint16 = (uint16_t) decode;
+        }
+        else if(sig->type & TYPE_INT24){
+          sig->decoded.uint24 = (uint32_t) decode;
+        }
+        else if(sig->type & TYPE_INT32){
+          sig->decoded.uint32 = (uint32_t) decode;
+        }
       }
-      msg->signal->decoded = decode;
     }
-    ++msg->signal; 
   }
 
 }
