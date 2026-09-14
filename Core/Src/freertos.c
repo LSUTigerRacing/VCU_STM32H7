@@ -150,14 +150,28 @@ void StartDefaultTask(void *argument)
 void StartADCTask(void *argument)
 {
   /* USER CODE BEGIN StartADCTask */
-  HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, 1); // Change the 1 to ADC12_BUFFER_COUNT when those buffers are used
+  HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, ADC12_BUFFER_COUNT);
   HAL_TIM_Base_Start(&htim1);
 
   /* Infinite loop */
   for(;;)
   {
+    sus_fl.avg = (sus_fl.data1 + sus_fl.data2) / 2;
+    sus_fr.avg = (sus_fr.data1 + sus_fr.data2) / 2;
+    sus_bl.avg = (sus_bl.data1 + sus_bl.data2) / 2;
+    sus_br.avg = (sus_br.data1 + sus_br.data2) / 2;
+
+    steering_ang.avg = (steering_ang.data1 + steering_ang.data2) / 2;
+
+    throttle_pos.avg = (throttle_pos.data1 + throttle_pos.data2) / 2;
+
+    inlet_temp.avg = (inlet_temp.data1 + inlet_temp.data2) / 2;
+    outlet_temp.avg = (outlet_temp.data1 + outlet_temp.data2) / 2;
+
+    f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
+    b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
+
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    pot_reading[2] = (pot_reading[0] + pot_reading[1]) / 2;
   }
   /* USER CODE END StartADCTask */
 }

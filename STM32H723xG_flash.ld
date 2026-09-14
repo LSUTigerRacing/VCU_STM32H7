@@ -249,8 +249,6 @@ SECTIONS
     . = ALIGN (4);
   } >RAM_D2
 
-
-
   /* Remove information from the standard libraries */
   /DISCARD/ :
   {
