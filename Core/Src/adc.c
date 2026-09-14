@@ -21,9 +21,7 @@
 #include "adc.h"
 
 /* USER CODE BEGIN 0 */
-#include "FreeRTOS.h"
-#include "cmsis_os2.h"
-#include "task.h"
+
 /* BEGIN Extern*/
 extern osThreadId_t ADCTaskHandle;
 /* END Extern*/
