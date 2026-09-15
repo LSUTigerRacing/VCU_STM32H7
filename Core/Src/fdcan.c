@@ -24,7 +24,6 @@
 
 /* USER CODE BEGIN 0 */
 
-/* defines ------------------------------------------------------------------*/
 #define BYTE1 8
 #define BYTE2 16
 #define BYTE3 24
@@ -40,65 +39,47 @@
 #define TYPE_INT32 BIT5
 #define TYPE_FLOAT BIT6
 
-/* End of defines ------------------------------------------------------------------*/
+#define BMS1_MSG_INDEX 0
+#define BMS2_MSG_INDEX 1
+#define DTI1_MSG_INDEX 2
+#define DTI2_MSG_INDEX 3
+#define DIT3_MSG_INDEX 4
+#define DTI4_MSG_INDEX 5
+#define DIT5_MSG_INDEX 6
+#define COOL_IN_MSG_INDEX 7
+#define COOL_OUT_MSG_INDEX 8
+#define COOL_FLOW_MSG_INDEX 9
+#define BRAKE_PSI_MSG_INDEX 10
+#define WHEEL1_MSG_INDEX 11
+#define WHEEL2_MSG_INDEX 12
+#define ROTOR1_MSG_INDEX 13
+#define ROTOR2_MSG_INDEX 14
 
-/* Extern Variables ------------------------------------------------------------------*/
+extern osMessageQueueId_t CAN1rxQHandle;
+extern osMessageQueueId_t CAN1txQHandle;
+extern osMessageQueueId_t CAN2rxQHandle;
+extern osMessageQueueId_t CAN2txQHandle;
+extern osMutexId_t CAN1rxMHandle;
+extern osMutexId_t CAN1txMHandle;
+extern osMutexId_t CAN2rxMHandle;
+extern osMutexId_t CAN2txMHandle;
+extern osSemaphoreId_t CAN1rxSHandle;
+extern osSemaphoreId_t CAN1txSHandle;
+extern osSemaphoreId_t CAN2rxSHandle;
+extern osSemaphoreId_t CAN2txSHandle;
 
-/* End of Extern Variables ------------------------------------------------------------------*/
-
-/* Extern Functions ------------------------------------------------------------------*/
 extern uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size);
-/*End of Extern Functions ------------------------------------------------------------------*/
-
-/* Private Variables ------------------------------------------------------------------*/
-static uint8_t fdcan0_busy;
-static uint8_t fdcan1_busy;
-/* End of Private Variables ------------------------------------------------------------------*/
-
-/* Private Functions ------------------------------------------------------------------*/
-
-/* End of Private Functions ------------------------------------------------------------------*/
-
-/* Global Variables  ------------------------------------------------------------------*/
-typedef union{
-  uint8_t uint8;
-  int8_t int8;
-  uint16_t uint16;
-  int16_t int16;
-  uint32_t uint24; //non standard type
-  int32_t int24; //non standard type
-  uint32_t uint32;
-  int32_t int32;
-  float flt;
-}CAN_decoded_values;
-
-typedef struct{
-  uint8_t start_bit;
-  uint8_t end_bit;
-  float scale;
-  int16_t offset;
-  float min;
-  float max;
-  uint8_t type;
-  CAN_decoded_values decoded;
-}CAN_Signal;
 
 typedef struct{
   uint16_t id;
-  uint8_t dlc;
-  uint64_t data;
-  CAN_Signal *signal;
-  uint8_t sig_count;
-} CAN_Msg;
+  CAN_decoded_values *decoded;
+}CAN_Decoded;
 
-/* End of Global Variables ------------------------------------------------------------------*/
+static CAN_Decoded CAN_Storage[50];
+static uint8_t fdcan0_busy;
+static uint8_t fdcan1_busy;
 
-/* Global Functions  ------------------------------------------------------------------*/
-CAN_Msg Prepare_Message(uint32_t id, uint8_t *data, uint8_t dlc);
-void Decode_Message(CAN_Msg *msg);
-
-static void Assign_Signal(CAN_Msg *msg);
-/* End of Global Functions ------------------------------------------------------------------*/
+static void Store_Message(CAN_Decoded msg);
 /* USER CODE END 0 */
 
 FDCAN_HandleTypeDef hfdcan1;
@@ -340,6 +321,8 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* fdcanHandle)
     /* FDCAN2 interrupt Init */
     HAL_NVIC_SetPriority(FDCAN2_IT0_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(FDCAN2_IT0_IRQn);
+    HAL_NVIC_SetPriority(FDCAN2_IT1_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(FDCAN2_IT1_IRQn);
   /* USER CODE BEGIN FDCAN2_MspInit 1 */
 
   /* USER CODE END FDCAN2_MspInit 1 */
@@ -428,6 +411,7 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* fdcanHandle)
 
     /* FDCAN2 interrupt Deinit */
     HAL_NVIC_DisableIRQ(FDCAN2_IT0_IRQn);
+    HAL_NVIC_DisableIRQ(FDCAN2_IT1_IRQn);
   /* USER CODE BEGIN FDCAN2_MspDeInit 1 */
 
   /* USER CODE END FDCAN2_MspDeInit 1 */
@@ -458,56 +442,90 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* fdcanHandle)
 /* USER CODE BEGIN 1 */
 
 /// @brief Preparing a message that is about to be sent
+/// @param hfdcan CAN handler pointer
 /// @param id CAN id
 /// @param data CAN data
-/// @return Prepared CAN message
-CAN_Msg Prepare_Message(uint32_t id, uint8_t *data, uint8_t dlc){
-  CAN_Msg ret;
-  uint64_t data_convert;
-
-  for(uint8_t i =0; i < 8; i++){
-      data_convert |= (uint64_t)data[i] << (8 * i);
-    }
+/// @param dlc Data length code
+void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc){
+  CAN_Msg_Raw ret;
 
   ret.id = id;
   ret.dlc = dlc;
-  ret.data = data_convert;
 
-  return ret;
+  for(uint8_t i = 0; i < 8; i++){
+    ret.data[i] = data[i];
+  }
+  if(hfdcan->Instance == FDCAN1){
+    osSemaphoreAcquire(CAN1txSHandle, 0);
+    osMessageQueuePut(CAN1txQHandle, &ret, 0, 0);
+    osSemaphoreRelease(CAN1txSHandle);
+  }
+  else if(hfdcan->Instance == FDCAN2){
+    osSemaphoreAcquire(CAN2txSHandle, 0);
+    osMessageQueuePut(CAN2txQHandle, &ret, 0, 0);
+    osSemaphoreRelease(CAN2txSHandle);
+  }
+}
+
+/// @brief Stores decoded CAN message in CAN_Storage array
+/// @param msg Decoded CAN message
+static void Store_Message(CAN_Decoded msg){
+  switch(msg.id){
+    case BMS1_MSG_INDEX:
+      CAN_Storage[BMS1_MSG_INDEX].id = msg.id;
+      CAN_Storage[BMS1_MSG_INDEX].decoded = &msg.decoded[0];
+      break;
+  }
 }
 
 /// @brief Assigns signals to the message and should be called after recieving message 
 /// @param msg Pointer to CAN message
-void Assign_Signal(CAN_Msg *msg){
-    
+DBC_Translation Assign_Signal(CAN_Msg_Raw *msg){
+    DBC_Translation dbc;
+
+    dbc.sig_count = 0;
+    dbc.signal = NULL;
+
     switch(msg->id){
       case 10:
       //implement actual dbc definition
       CAN_Signal sig[] = {
         {.start_bit = 0, .end_bit = 7, .min = 0, .max = 88, .offset = 0.5, .scale = 0.75, .type = 0}
       };
-      msg->signal = sig;
-      msg->sig_count = sizeof(sig)/sizeof(sig[0]);
+      
+      dbc.signal = sig;
+      dbc.sig_count = sizeof(sig)/sizeof(sig[0]);
+
+      return dbc;
       break;
 
       default:
       msg->id = 999; //dbc message not tracked
     }
+
+    return dbc;
 }
 
 /// @brief Decodes CAN messages based on .dbc files
 /// @param msg utilized to decode message
-void Decode_Message(CAN_Msg *msg){
-  if(msg->id == 999){
+void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
+  if(msg.id == 999){
     return; //error case
   }
 
   uint64_t translated_data;
+  CAN_Decoded ret;
+  CAN_decoded_values values[dbc.sig_count];
   
-  translated_data = msg->data;
+  dbc.id = msg.id;
+  translated_data = 0;
+
+  for(uint8_t i = 0; i < 8; i++){
+    translated_data |= (msg.data[i]) << (i * 8);
+  }
   
-  for(uint8_t i =0; i < msg->sig_count;i++ ){
-    CAN_Signal *sig = &msg->signal[i];
+  for(uint8_t i =0; i < dbc.sig_count;i++ ){
+    CAN_Signal *sig = &dbc.signal[i];
     uint8_t size;
 
     size = sig->end_bit - sig->start_bit + 1;
@@ -522,7 +540,7 @@ void Decode_Message(CAN_Msg *msg){
 
       raw = extract_bits(translated_data, sig->start_bit, size);
       signed_raw = (int64_t) raw;
-      if(raw & (1ULL << size -1)){
+      if(raw & (1ULL << (size - 1))){
         signed_raw -= (1ULL << size);
       }
 
@@ -533,23 +551,24 @@ void Decode_Message(CAN_Msg *msg){
         decode *= sig->scale;
         decode += sig->offset;
 
-        sig->decoded.flt = decode;
+        values[i].flt = decode;
       }
       else{
         signed_raw *= sig->scale;
         signed_raw += sig->offset;
 
         if(sig->type & TYPE_INT8){
-          sig->decoded.int8 = (int8_t) signed_raw;
+          values[i].int8 = (int8_t) signed_raw;
+          
         }
         else if(sig->type & TYPE_INT16){
-          sig->decoded.int16 = (int16_t) signed_raw;
+          values[i].int16 = (int16_t) signed_raw;
         }
         else if(sig->type & TYPE_INT24){
-          sig->decoded.int24 = (int32_t) signed_raw;
+          values[i].int24 = (int32_t) signed_raw;
         }
         else if(sig->type & TYPE_INT32){
-          sig->decoded.int32 = (int32_t) signed_raw;
+          values[i].int32 = (int32_t) signed_raw;
 }
       }
     }   
@@ -566,7 +585,7 @@ void Decode_Message(CAN_Msg *msg){
         decode *= sig->scale;
         decode += sig->offset;
 
-        sig->decoded.flt = decode;
+        values[i].flt = decode;
       }
       else{
         uint64_t decode;
@@ -583,53 +602,52 @@ void Decode_Message(CAN_Msg *msg){
         }
 
         if(sig->type & TYPE_INT8){
-          sig->decoded.uint8 = (uint8_t) decode;
+          values[i].uint8 = (uint8_t) decode;
         }
         else if(sig->type & TYPE_INT16){
-          sig->decoded.uint16 = (uint16_t) decode;
+          values[i].uint16 = (uint16_t) decode;
         }
         else if(sig->type & TYPE_INT24){
-          sig->decoded.uint24 = (uint32_t) decode;
+          values[i].uint24 = (uint32_t) decode;
         }
         else if(sig->type & TYPE_INT32){
-          sig->decoded.uint32 = (uint32_t) decode;
+          values[i].uint32 = (uint32_t) decode;
         }
       }
     }
   }
-
+  ret.id = msg.id;
+  ret.decoded = values;
+  Store_Message(ret);
 }
 
-/// @brief Adds messages to CAN2 FIFO
-/// @param hfdcan pointer to can
-void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan){
-
-}
-
-/// @brief Adds data to be sent over CAN0 
-/// @param data The data that wants to be sent over
-void FDCAN0_Tx(uint8_t *data, uint32_t id){
+/// @brief Used for CAN1 bus transmissions with queue mode 
+/// @param hfdcan 
+/// @param BufferIndexes 
+void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes){
   HAL_StatusTypeDef status;
   FDCAN_TxHeaderTypeDef header;
-  header.Identifier = id;
-  header.TxFrameType         = FDCAN_DATA_FRAME;
-  header.DataLength          = FDCAN_DLC_BYTES_8;
+  CAN_Msg_Raw raw_msg;
+
+  osMessageQueueGet(CAN1txQHandle, &raw_msg, 0, 0);
+
+  header.Identifier = raw_msg.id;
+  header.TxFrameType = FDCAN_DATA_FRAME;
+  header.DataLength = raw_msg.dlc;
   header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
   header.BitRateSwitch       = FDCAN_BRS_OFF;       // OFF if you're not using CAN FD bit-rate switching
-  header.FDFormat            = FDCAN_CLASSIC_CAN;   // or FDCAN_FD_CAN if using FD frames
+  header.FDFormat            = FDCAN_CLASSIC_CAN;
   header.TxEventFifoControl  = FDCAN_NO_TX_EVENTS;  // unless you're using the Tx event FIFO
-  header.MessageMarker       = 0;                   // only matters if using Tx event FIFO
+  header.MessageMarker       = 0;
 
-  status = HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1,&header,data); 
-
+  osSemaphoreAcquire(CAN1txSHandle, 0);
+  status = HAL_FDCAN_AddMessageToTxFifoQ(hfdcan,&header, raw_msg.data);
+  osSemaphoreRelease(CAN1txSHandle);
   switch(status){
     case HAL_OK:
-
     break;
 
     case HAL_BUSY:
-    fdcan0_busy++;
-    break;
 
     default:
     Error_Handler();
@@ -637,6 +655,37 @@ void FDCAN0_Tx(uint8_t *data, uint32_t id){
   }
 }
 
+/// @brief Adds messages to CAN2 FIFO
+/// @param hfdcan pointer to can
+void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan){
+  HAL_StatusTypeDef status;
+  FDCAN_TxHeaderTypeDef header;
+  CAN_Msg_Raw raw_msg;
+  osMessageQueueGet(CAN2txQHandle, &raw_msg, 0, 0);
+  
+  header.Identifier = raw_msg.id;
+  header.TxFrameType = FDCAN_DATA_FRAME;
+  header.DataLength = raw_msg.dlc;
+  header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  header.BitRateSwitch       = FDCAN_BRS_OFF;       // OFF if you're not using CAN FD bit-rate switching
+  header.FDFormat            = FDCAN_CLASSIC_CAN;
+  header.TxEventFifoControl  = FDCAN_NO_TX_EVENTS;  // unless you're using the Tx event FIFO
+  header.MessageMarker       = 0;    
+
+  status = HAL_FDCAN_AddMessageToTxFifoQ(hfdcan,&header, raw_msg.data);
+
+  switch(status){
+    case HAL_OK:
+
+    break;
+
+    case HAL_BUSY:
+
+    default:
+    Error_Handler();
+    break;
+  }
+}
 
 /// @brief Handles recieve for CAN RxFifo0 buffer
 /// @param hfdcan Pointer for CAN peripheral
@@ -644,24 +693,17 @@ void FDCAN0_Tx(uint8_t *data, uint32_t id){
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs){
   if(RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE){
     HAL_StatusTypeDef status;
-    uint8_t data[8];
     FDCAN_RxHeaderTypeDef header;
+    CAN_Msg_Raw recieved;
     
-    status = HAL_FDCAN_GetRxMessage(hfdcan,FDCAN_RX_FIFO0,&header, data);
+    status = HAL_FDCAN_GetRxMessage(hfdcan,FDCAN_RX_FIFO0,&header, recieved.data);
 
     switch(status){
       case HAL_OK:
-      CAN_Msg recieved;
-      recieved.data = 0;
-
       recieved.id = header.Identifier;
       recieved.dlc = header.DataLength;
 
-      for(uint8_t i =0; i < 8; i++){
-        recieved.data |= (uint64_t)data[i] << (8 * i);
-      }
-
-      Assign_Signal(&recieved);
+      osMessageQueuePut(CAN1rxQHandle, &recieved, 0, 0);
       break;
 
       case HAL_BUSY:
@@ -681,24 +723,17 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs){
   if(RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE){
     HAL_StatusTypeDef status;  
-    uint8_t data[8];
     FDCAN_RxHeaderTypeDef header;
+    CAN_Msg_Raw recieved;
 
-    status = HAL_FDCAN_GetRxMessage(hfdcan,FDCAN_RX_FIFO1,&header, data);
+    status = HAL_FDCAN_GetRxMessage(hfdcan,FDCAN_RX_FIFO1,&header, recieved.data);
 
     switch(status){
       case HAL_OK:
-      CAN_Msg recieved;
-      recieved.data = 0;
-
       recieved.id = header.Identifier;
       recieved.dlc = header.DataLength;
 
-      for(uint8_t i =0; i < 8; i++){
-        recieved.data |= (uint64_t)data[i] << (8 * i);
-      }
-      
-      Assign_Signal(&recieved);
+      osMessageQueuePut(CAN2rxQHandle,&recieved, 0, 0);
       break;
 
       case HAL_BUSY:
@@ -711,14 +746,6 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
     }
   }
 }
-
-/// @brief Used for CAN1 bus transmissions with queue mode
-/// @param hfdcan 
-/// @param BufferIndexes 
-void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes){
-  
-}
-
 
 /* USER CODE END 1 */
 
