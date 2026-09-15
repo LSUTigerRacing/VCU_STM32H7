@@ -26,6 +26,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "adc.h"
 
 /* USER CODE END Includes */
 
@@ -36,7 +37,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define D2_RAM __attribute__((section(".D2_RAM")))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,6 +47,11 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+extern TIM_HandleTypeDef htim1;
+extern ADC_HandleTypeDef hadc1;
+
+volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
+volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -144,10 +150,28 @@ void StartDefaultTask(void *argument)
 void StartADCTask(void *argument)
 {
   /* USER CODE BEGIN StartADCTask */
+  HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, ADC12_BUFFER_COUNT);
+  HAL_TIM_Base_Start(&htim1);
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    sus_fl.avg = (sus_fl.data1 + sus_fl.data2) / 2;
+    sus_fr.avg = (sus_fr.data1 + sus_fr.data2) / 2;
+    sus_bl.avg = (sus_bl.data1 + sus_bl.data2) / 2;
+    sus_br.avg = (sus_br.data1 + sus_br.data2) / 2;
+
+    steering_ang.avg = (steering_ang.data1 + steering_ang.data2) / 2;
+
+    throttle_pos.avg = (throttle_pos.data1 + throttle_pos.data2) / 2;
+
+    inlet_temp.avg = (inlet_temp.data1 + inlet_temp.data2) / 2;
+    outlet_temp.avg = (outlet_temp.data1 + outlet_temp.data2) / 2;
+
+    f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
+    b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
+
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   }
   /* USER CODE END StartADCTask */
 }

@@ -31,7 +31,9 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "FreeRTOS.h"
+#include "cmsis_os2.h"
+#include "task.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -57,6 +59,26 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define INLET_TEMPERATURE_Pin GPIO_PIN_1
+#define INLET_TEMPERATURE_GPIO_Port GPIOC
+#define OUTLET_TEMPERATURE_Pin GPIO_PIN_2
+#define OUTLET_TEMPERATURE_GPIO_Port GPIOA
+#define FRONT_BRAKE_PRESSURE_Pin GPIO_PIN_3
+#define FRONT_BRAKE_PRESSURE_GPIO_Port GPIOA
+#define BACK_BRAKE_PRESSURE_Pin GPIO_PIN_5
+#define BACK_BRAKE_PRESSURE_GPIO_Port GPIOA
+#define SUSPENSION_FL_Pin GPIO_PIN_6
+#define SUSPENSION_FL_GPIO_Port GPIOA
+#define SUSPENSION_BR_Pin GPIO_PIN_7
+#define SUSPENSION_BR_GPIO_Port GPIOA
+#define SUSPENSION_FR_Pin GPIO_PIN_4
+#define SUSPENSION_FR_GPIO_Port GPIOC
+#define STEERING_ANGLE_Pin GPIO_PIN_5
+#define STEERING_ANGLE_GPIO_Port GPIOC
+#define THROTTLE_PEDAL_POSITION_Pin GPIO_PIN_0
+#define THROTTLE_PEDAL_POSITION_GPIO_Port GPIOB
+#define SUSPENSION_BL_Pin GPIO_PIN_1
+#define SUSPENSION_BL_GPIO_Port GPIOB
 #define SD_Detect_Pin GPIO_PIN_14
 #define SD_Detect_GPIO_Port GPIOD
 #define DigOut_5_Pin GPIO_PIN_15
