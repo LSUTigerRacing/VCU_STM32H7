@@ -47,12 +47,44 @@ void MX_FDCAN2_Init(void);
 void MX_FDCAN3_Init(void);
 
 /* USER CODE BEGIN Prototypes */
+typedef union{
+  uint8_t uint8;
+  int8_t int8;
+  uint16_t uint16;
+  int16_t int16;
+  uint32_t uint24; //non standard type
+  int32_t int24; //non standard type
+  uint32_t uint32;
+  int32_t int32;
+  float flt;
+}CAN_decoded_values;
+
 typedef struct{
-  uint8_t buffer[BUFFERSIZE];
-  uint8_t head;
-  uint8_t tail;
-  uint8_t count;
-} CircularBuffer;
+  uint8_t start_bit;
+  uint8_t end_bit;
+  float scale;
+  int16_t offset;
+  float min;
+  float max;
+  uint8_t type;
+}CAN_Signal;
+
+typedef struct{
+  uint16_t id;
+  uint8_t sig_count;
+  CAN_Signal *signal;
+} DBC_Translation;
+
+typedef struct{
+  uint16_t id;
+  uint8_t dlc;
+  uint8_t data[8];
+} CAN_Msg_Raw;
+
+void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
+void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
+
+DBC_Translation Assign_Signal(CAN_Msg_Raw *msg);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

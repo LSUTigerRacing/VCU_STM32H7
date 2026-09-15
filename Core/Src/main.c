@@ -34,7 +34,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#define CMSIS
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
