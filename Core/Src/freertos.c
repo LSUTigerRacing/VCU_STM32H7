@@ -68,6 +68,13 @@ const osThreadAttr_t ADCTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal3,
 };
+/* Definitions for PWMTask */
+osThreadId_t PWMTaskHandle;
+const osThreadAttr_t PWMTask_attributes = {
+  .name = "PWMTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal7,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -76,6 +83,7 @@ const osThreadAttr_t ADCTask_attributes = {
 
 void StartDefaultTask(void *argument);
 void StartADCTask(void *argument);
+void StartPWMTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -111,6 +119,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of ADCTask */
   ADCTaskHandle = osThreadNew(StartADCTask, NULL, &ADCTask_attributes);
+
+  /* creation of PWMTask */
+  PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -174,6 +185,24 @@ void StartADCTask(void *argument)
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   }
   /* USER CODE END StartADCTask */
+}
+
+/* USER CODE BEGIN Header_StartPWMTask */
+/**
+* @brief Function implementing the PWMTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPWMTask */
+void StartPWMTask(void *argument)
+{
+  /* USER CODE BEGIN StartPWMTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartPWMTask */
 }
 
 /* Private application code --------------------------------------------------*/
