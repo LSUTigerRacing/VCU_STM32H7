@@ -57,11 +57,11 @@ typedef union{
   uint32_t uint32;
   int32_t int32;
   float flt;
-}CAN_decoded_values;
+}CAN_Decoded_Values;
 
 typedef struct{
   uint8_t start_bit;
-  uint8_t end_bit;
+  uint8_t bit_length;
   float scale;
   int16_t offset;
   float min;

@@ -72,13 +72,15 @@ extern uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size);
 
 typedef struct{
   uint16_t id;
-  CAN_decoded_values *decoded;
+  CAN_Decoded_Values *decoded;
 }CAN_Decoded;
 
 static CAN_Decoded CAN_Storage[50];
 static uint8_t fdcan0_busy;
 static uint8_t fdcan1_busy;
 
+CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
+CAN_Decoded_Values* Get_Message(uint16_t id);
 static void Store_Message(CAN_Decoded msg);
 /* USER CODE END 0 */
 
@@ -475,7 +477,11 @@ static void Store_Message(CAN_Decoded msg){
       CAN_Storage[BMS1_MSG_INDEX].id = msg.id;
       CAN_Storage[BMS1_MSG_INDEX].decoded = &msg.decoded[0];
       break;
+
+    default:
+      msg.id = 999; //untracked message
   }
+
 }
 
 /// @brief Assigns signals to the message and should be called after recieving message 
@@ -490,7 +496,7 @@ DBC_Translation Assign_Signal(CAN_Msg_Raw *msg){
       case 10:
       //implement actual dbc definition
       CAN_Signal sig[] = {
-        {.start_bit = 0, .end_bit = 7, .min = 0, .max = 88, .offset = 0.5, .scale = 0.75, .type = 0}
+        {.start_bit = 0, .bit_length = 7, .min = 0, .max = 88, .offset = 0.5, .scale = 0.75, .type = 0}
       };
       
       dbc.signal = sig;
@@ -508,6 +514,7 @@ DBC_Translation Assign_Signal(CAN_Msg_Raw *msg){
 
 /// @brief Decodes CAN messages based on .dbc files
 /// @param msg utilized to decode message
+///@param dbc The dbc translation for the message
 void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
   if(msg.id == 999){
     return; //error case
@@ -515,7 +522,7 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
 
   uint64_t translated_data;
   CAN_Decoded ret;
-  CAN_decoded_values values[dbc.sig_count];
+  CAN_Decoded_Values values[dbc.sig_count];
   
   dbc.id = msg.id;
   translated_data = 0;
@@ -528,7 +535,7 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
     CAN_Signal *sig = &dbc.signal[i];
     uint8_t size;
 
-    size = sig->end_bit - sig->start_bit + 1;
+    size = dbc.signal->bit_length;
     //Signed + Big Endian
     if(sig->type & SIGNED && sig->type & BIG_ENDIAN){
       //worry about if there are big endian sigs
@@ -619,6 +626,34 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
   ret.id = msg.id;
   ret.decoded = values;
   Store_Message(ret);
+}
+
+CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index){
+  //implement actual message
+  CAN_Decoded_Values ret;
+  switch(id){
+    case 0x6B1:
+      ret = CAN_Storage[BMS1_MSG_INDEX].decoded[index];
+
+    default:
+      ret.int8 = 0;
+    }
+  
+    return ret;
+}
+
+CAN_Decoded_Values* Get_Message(uint16_t id){
+  CAN_Decoded_Values *ret;
+  //implement actual messages
+  switch(id){
+    case 0x6B1:
+      return CAN_Storage[BMS1_MSG_INDEX].decoded;
+
+    default:
+      ret[0].uint8 = 6;
+      ret[1].uint8 = 7;
+  }
+  return ret;
 }
 
 /// @brief Used for CAN1 bus transmissions with queue mode 
