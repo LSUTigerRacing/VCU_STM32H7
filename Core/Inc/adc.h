@@ -82,6 +82,8 @@ typedef struct {
 extern volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
 extern volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 
+// Sensor definitions
+
 // Suspension shock travel
 extern volatile ADC_Data sus_fl;
 extern volatile ADC_Data sus_fr;
@@ -101,7 +103,8 @@ extern volatile ADC_Data outlet_temp;
 // Front/Back brake pressure
 extern volatile ADC_Data f_brake_press;
 extern volatile ADC_Data b_brake_press;
-
+extern volatile uint32_t test_reading;
+extern volatile uint32_t pump_speed;
 /* END Extern*/
 
 /* USER CODE END Private defines */

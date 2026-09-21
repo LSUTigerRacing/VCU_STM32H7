@@ -126,7 +126,6 @@ int main(void)
   MX_FATFS_Init();
   MX_OCTOSPI1_Init();
   /* USER CODE BEGIN 2 */
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
   /* USER CODE END 2 */
 
   /* Init scheduler */

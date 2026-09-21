@@ -27,6 +27,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "adc.h"
+#include "tim.h"
 
 /* USER CODE END Includes */
 
@@ -52,6 +53,9 @@ extern ADC_HandleTypeDef hadc1;
 
 volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
 volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
+
+volatile uint32_t test_reading;
+volatile uint32_t pump_speed;
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -161,12 +165,16 @@ void StartDefaultTask(void *argument)
 void StartADCTask(void *argument)
 {
   /* USER CODE BEGIN StartADCTask */
-  HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, ADC12_BUFFER_COUNT);
+
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
+
   HAL_TIM_Base_Start(&htim1);
 
   /* Infinite loop */
   for(;;)
   {
+    HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, ADC12_BUFFER_COUNT);
+
     sus_fl.avg = (sus_fl.data1 + sus_fl.data2) / 2;
     sus_fr.avg = (sus_fr.data1 + sus_fr.data2) / 2;
     sus_bl.avg = (sus_bl.data1 + sus_bl.data2) / 2;
@@ -197,9 +205,17 @@ void StartADCTask(void *argument)
 void StartPWMTask(void *argument)
 {
   /* USER CODE BEGIN StartPWMTask */
+  uint32_t counter_min = 2750;
+  uint32_t counter_max = 5500;
+  uint16_t adc_max_val = 0xFFFF;
+
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   /* Infinite loop */
   for(;;)
   {
+    test_reading = f_brake_press.avg;
+    pump_speed = counter_min + ((test_reading * (counter_max - counter_min)) / adc_max_val);
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pump_speed);
     osDelay(1);
   }
   /* USER CODE END StartPWMTask */
