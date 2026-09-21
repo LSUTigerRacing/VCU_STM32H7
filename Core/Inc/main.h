@@ -61,6 +61,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define INLET_TEMPERATURE_Pin GPIO_PIN_1
 #define INLET_TEMPERATURE_GPIO_Port GPIOC
+#define WATER_PUMP_Pin GPIO_PIN_0
+#define WATER_PUMP_GPIO_Port GPIOA
 #define OUTLET_TEMPERATURE_Pin GPIO_PIN_2
 #define OUTLET_TEMPERATURE_GPIO_Port GPIOA
 #define FRONT_BRAKE_PRESSURE_Pin GPIO_PIN_3
