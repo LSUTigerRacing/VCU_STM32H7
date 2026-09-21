@@ -205,16 +205,21 @@ void StartADCTask(void *argument)
 void StartPWMTask(void *argument)
 {
   /* USER CODE BEGIN StartPWMTask */
-  uint32_t counter_min = 2750;
-  uint32_t counter_max = 5500;
-  uint16_t adc_max_val = 0xFFFF;
-
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+
+  uint16_t pump_on = 900; // 900/1000 = 90% duty cycle
+  uint16_t pump_off = 100; // 100/1000 = 10% duty cycle
   /* Infinite loop */
   for(;;)
   {
-    test_reading = f_brake_press.avg;
-    pump_speed = counter_min + ((test_reading * (counter_max - counter_min)) / adc_max_val);
+    test_reading = inlet_temp.avg;
+
+    if (test_reading >= 60000) {
+      pump_speed = pump_on; 
+    } else if (test_reading <= 10000) {
+      pump_speed = pump_off;
+    }
+
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pump_speed);
     osDelay(1);
   }
