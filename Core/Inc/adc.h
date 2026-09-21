@@ -29,9 +29,6 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-#include "FreeRTOS.h"
-#include "cmsis_os2.h"
-#include "task.h"
 
 /* USER CODE END Includes */
 
@@ -71,6 +68,16 @@ extern ADC_HandleTypeDef hadc3;
 
 /* END Defines*/
 
+/* BEGIN Typedef */
+
+typedef struct {
+  uint32_t data1;
+  uint32_t data2;
+  uint32_t avg;
+} ADC_Data;
+
+/* BEGIN Typedef */
+
 /* BEGIN Extern */
 extern volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
 extern volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
@@ -97,15 +104,6 @@ extern volatile ADC_Data b_brake_press;
 
 /* END Extern*/
 
-/* BEGIN Typedef */
-
-typedef struct {
-  uint32_t data1;
-  uint32_t data2;
-  uint32_t avg;
-} ADC_Data;
-
-/* BEGIN Typedef */
 /* USER CODE END Private defines */
 
 void MX_ADC1_Init(void);
