@@ -34,7 +34,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define CMSIS
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -209,21 +209,6 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-/// @brief Extracts bits from a starting point and takes defined amount
-/// @param data data that needs to be extracted from
-/// @param start_bit starting bit that wants to be extracted from data
-/// @param size number of bits that are going to be extracted
-/// @return Desired bits
-uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size){
-  if(size > 64 || size == 0){
-    return 0;
-  }
-
-  uint64_t mask;
-
-  mask = (1ULL << size) - 1;
-  return ((data >> start_bit) & mask);
-}
 /* USER CODE END 4 */
 
  /* MPU Configuration */
@@ -288,7 +273,6 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
-
   }
   /* USER CODE END Error_Handler_Debug */
 }
