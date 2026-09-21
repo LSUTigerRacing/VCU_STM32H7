@@ -22,13 +22,81 @@
 
 /* USER CODE BEGIN 0 */
 
+/* BEGIN Extern*/
+extern osThreadId_t ADCTaskHandle;
+/* END Extern*/
+
+/* BEGIN Globals*/
+// Suspension shock travel
+volatile ADC_Data sus_fl;
+volatile ADC_Data sus_fr;
+volatile ADC_Data sus_bl;
+volatile ADC_Data sus_br;
+
+// Steering angle
+volatile ADC_Data steering_ang;
+
+// Throttle pedal position
+volatile ADC_Data throttle_pos;
+
+// Radiator inlet/outlet temperature
+volatile ADC_Data inlet_temp;
+volatile ADC_Data outlet_temp;
+
+// Front/Back brake pressure
+volatile ADC_Data f_brake_press;
+volatile ADC_Data b_brake_press;
+/* END Globals*/
+
+/* BEGIN Interrupts*/
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
+  if (hadc->Instance == ADC1) {
+    sus_fl.data1 = adc12_dma_buf[SUS_FL] & 0xFFFF; 
+    sus_fl.data2 = adc12_dma_buf[SUS_FL] >> 16;
+
+    sus_fr.data1 = adc12_dma_buf[SUS_FR] & 0xFFFF; 
+    sus_fr.data2 = adc12_dma_buf[SUS_FR] >> 16;
+
+    sus_bl.data1 = adc12_dma_buf[SUS_BL] & 0xFFFF; 
+    sus_bl.data2 = adc12_dma_buf[SUS_BL] >> 16;
+
+    sus_br.data1 = adc12_dma_buf[SUS_BR] & 0xFFFF; 
+    sus_br.data2 = adc12_dma_buf[SUS_BR] >> 16;
+
+    steering_ang.data1 = adc12_dma_buf[STEERING] & 0xFFFF; 
+    steering_ang.data2 = adc12_dma_buf[STEERING] >> 16;
+
+    throttle_pos.data1 = adc12_dma_buf[THROTTLE] & 0xFFFF; 
+    throttle_pos.data2 = adc12_dma_buf[THROTTLE] >> 16;
+
+    inlet_temp.data1 = adc12_dma_buf[INLET] & 0xFFFF; 
+    inlet_temp.data2 = adc12_dma_buf[INLET] >> 16;
+
+    outlet_temp.data1 = adc12_dma_buf[OUTLET] & 0xFFFF; 
+    outlet_temp.data2 = adc12_dma_buf[OUTLET] >> 16;
+
+    f_brake_press.data1 = adc12_dma_buf[F_BRAKE] & 0xFFFF; 
+    f_brake_press.data2 = adc12_dma_buf[F_BRAKE] >> 16;
+
+    b_brake_press.data1 = adc12_dma_buf[B_BRAKE] & 0xFFFF; 
+    b_brake_press.data2 = adc12_dma_buf[B_BRAKE] >> 16;
+
+  }
+
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  vTaskNotifyGiveFromISR(ADCTaskHandle, &xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+/* END Interrupts*/
+
 /* USER CODE END 0 */
 
 ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 ADC_HandleTypeDef hadc3;
 DMA_HandleTypeDef hdma_adc1;
-DMA_HandleTypeDef hdma_adc2;
 
 /* ADC1 init function */
 void MX_ADC1_Init(void)
@@ -50,15 +118,15 @@ void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc1.Init.Resolution = ADC_RESOLUTION_16B;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 10;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DMA_CIRCULAR;
+  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIG_T1_TRGO;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
+  hadc1.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DMA_ONESHOT;
   hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
   hadc1.Init.LeftBitShift = ADC_LEFTBITSHIFT_NONE;
   hadc1.Init.OversamplingMode = DISABLE;
@@ -82,11 +150,92 @@ void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_64CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_387CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   sConfig.OffsetSignedSaturation = DISABLE;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_5;
+  sConfig.Rank = ADC_REGULAR_RANK_3;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_7;
+  sConfig.Rank = ADC_REGULAR_RANK_4;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_REGULAR_RANK_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_9;
+  sConfig.Rank = ADC_REGULAR_RANK_6;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_11;
+  sConfig.Rank = ADC_REGULAR_RANK_7;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_14;
+  sConfig.Rank = ADC_REGULAR_RANK_8;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_15;
+  sConfig.Rank = ADC_REGULAR_RANK_9;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_19;
+  sConfig.Rank = ADC_REGULAR_RANK_10;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -115,13 +264,13 @@ void MX_ADC2_Init(void)
   hadc2.Instance = ADC2;
   hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc2.Init.Resolution = ADC_RESOLUTION_16B;
-  hadc2.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc2.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc2.Init.LowPowerAutoWait = DISABLE;
-  hadc2.Init.ContinuousConvMode = ENABLE;
-  hadc2.Init.NbrOfConversion = 1;
+  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.NbrOfConversion = 10;
   hadc2.Init.DiscontinuousConvMode = DISABLE;
-  hadc2.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DMA_CIRCULAR;
+  hadc2.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DR;
   hadc2.Init.Overrun = ADC_OVR_DATA_PRESERVED;
   hadc2.Init.LeftBitShift = ADC_LEFTBITSHIFT_NONE;
   hadc2.Init.OversamplingMode = DISABLE;
@@ -133,13 +282,94 @@ void MX_ADC2_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_7;
+  sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_64CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_387CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   sConfig.OffsetSignedSaturation = DISABLE;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_5;
+  sConfig.Rank = ADC_REGULAR_RANK_3;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_7;
+  sConfig.Rank = ADC_REGULAR_RANK_4;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_REGULAR_RANK_5;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_9;
+  sConfig.Rank = ADC_REGULAR_RANK_6;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_11;
+  sConfig.Rank = ADC_REGULAR_RANK_7;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_14;
+  sConfig.Rank = ADC_REGULAR_RANK_8;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_15;
+  sConfig.Rank = ADC_REGULAR_RANK_9;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_19;
+  sConfig.Rank = ADC_REGULAR_RANK_10;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -169,11 +399,11 @@ void MX_ADC3_Init(void)
   hadc3.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
   hadc3.Init.Resolution = ADC_RESOLUTION_12B;
   hadc3.Init.DataAlign = ADC3_DATAALIGN_RIGHT;
-  hadc3.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc3.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc3.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc3.Init.LowPowerAutoWait = DISABLE;
   hadc3.Init.ContinuousConvMode = DISABLE;
-  hadc3.Init.NbrOfConversion = 1;
+  hadc3.Init.NbrOfConversion = 2;
   hadc3.Init.DiscontinuousConvMode = DISABLE;
   hadc3.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -198,6 +428,15 @@ void MX_ADC3_Init(void)
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   sConfig.OffsetSign = ADC3_OFFSET_SIGN_NEGATIVE;
+  if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -227,28 +466,36 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
       __HAL_RCC_ADC12_CLK_ENABLE();
     }
 
-    __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
     /**ADC1 GPIO Configuration
+    PC1     ------> ADC1_INP11
     PA1     ------> ADC1_INP17
+    PA2     ------> ADC1_INP14
+    PA3     ------> ADC1_INP15
+    PA5     ------> ADC1_INP19
     PA6     ------> ADC1_INP3
+    PA7     ------> ADC1_INP7
     PC4     ------> ADC1_INP4
+    PC5     ------> ADC1_INP8
+    PB0     ------> ADC1_INP9
     PB1     ------> ADC1_INP5
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_6;
+    GPIO_InitStruct.Pin = INLET_TEMPERATURE_Pin|SUSPENSION_FR_Pin|STEERING_ANGLE_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = GPIO_PIN_4;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_1;
+    GPIO_InitStruct.Pin = GPIO_PIN_1|OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin
+                          |SUSPENSION_FL_Pin|SUSPENSION_BR_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = THROTTLE_PEDAL_POSITION_Pin|SUSPENSION_BL_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     /* ADC1 DMA Init */
@@ -258,9 +505,9 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     hdma_adc1.Init.Direction = DMA_PERIPH_TO_MEMORY;
     hdma_adc1.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_adc1.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_adc1.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
-    hdma_adc1.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
-    hdma_adc1.Init.Mode = DMA_CIRCULAR;
+    hdma_adc1.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+    hdma_adc1.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+    hdma_adc1.Init.Mode = DMA_NORMAL;
     hdma_adc1.Init.Priority = DMA_PRIORITY_LOW;
     hdma_adc1.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     if (HAL_DMA_Init(&hdma_adc1) != HAL_OK)
@@ -289,50 +536,36 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
       __HAL_RCC_ADC12_CLK_ENABLE();
     }
 
-    __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
     /**ADC2 GPIO Configuration
+    PC1     ------> ADC2_INP11
     PA2     ------> ADC2_INP14
     PA3     ------> ADC2_INP15
     PA5     ------> ADC2_INP19
+    PA6     ------> ADC2_INP3
     PA7     ------> ADC2_INP7
+    PC4     ------> ADC2_INP4
     PC5     ------> ADC2_INP8
     PB0     ------> ADC2_INP9
+    PB1     ------> ADC2_INP5
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7;
+    GPIO_InitStruct.Pin = INLET_TEMPERATURE_Pin|SUSPENSION_FR_Pin|STEERING_ANGLE_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = GPIO_PIN_5;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Pin = OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin|SUSPENSION_FL_Pin
+                          |SUSPENSION_BR_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = THROTTLE_PEDAL_POSITION_Pin|SUSPENSION_BL_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-    /* ADC2 DMA Init */
-    /* ADC2 Init */
-    hdma_adc2.Instance = DMA1_Stream1;
-    hdma_adc2.Init.Request = DMA_REQUEST_ADC2;
-    hdma_adc2.Init.Direction = DMA_PERIPH_TO_MEMORY;
-    hdma_adc2.Init.PeriphInc = DMA_PINC_DISABLE;
-    hdma_adc2.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_adc2.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
-    hdma_adc2.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
-    hdma_adc2.Init.Mode = DMA_CIRCULAR;
-    hdma_adc2.Init.Priority = DMA_PRIORITY_LOW;
-    hdma_adc2.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-    if (HAL_DMA_Init(&hdma_adc2) != HAL_OK)
-    {
-      Error_Handler();
-    }
-
-    __HAL_LINKDMA(adcHandle,DMA_Handle,hdma_adc2);
 
     /* ADC2 interrupt Init */
     HAL_NVIC_SetPriority(ADC_IRQn, 5, 0);
@@ -370,11 +603,10 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     __HAL_RCC_GPIOC_CLK_ENABLE();
     /**ADC3 GPIO Configuration
     PC0     ------> ADC3_INP10
-    PC1     ------> ADC3_INP11
     PC2_C     ------> ADC3_INP0
     PC3_C     ------> ADC3_INP1
     */
-    GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
@@ -404,16 +636,24 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
     }
 
     /**ADC1 GPIO Configuration
+    PC1     ------> ADC1_INP11
     PA1     ------> ADC1_INP17
+    PA2     ------> ADC1_INP14
+    PA3     ------> ADC1_INP15
+    PA5     ------> ADC1_INP19
     PA6     ------> ADC1_INP3
+    PA7     ------> ADC1_INP7
     PC4     ------> ADC1_INP4
+    PC5     ------> ADC1_INP8
+    PB0     ------> ADC1_INP9
     PB1     ------> ADC1_INP5
     */
-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_1|GPIO_PIN_6);
+    HAL_GPIO_DeInit(GPIOC, INLET_TEMPERATURE_Pin|SUSPENSION_FR_Pin|STEERING_ANGLE_Pin);
 
-    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_4);
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_1|OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin
+                          |SUSPENSION_FL_Pin|SUSPENSION_BR_Pin);
 
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_1);
+    HAL_GPIO_DeInit(GPIOB, THROTTLE_PEDAL_POSITION_Pin|SUSPENSION_BL_Pin);
 
     /* ADC1 DMA DeInit */
     HAL_DMA_DeInit(adcHandle->DMA_Handle);
@@ -443,21 +683,23 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
     }
 
     /**ADC2 GPIO Configuration
+    PC1     ------> ADC2_INP11
     PA2     ------> ADC2_INP14
     PA3     ------> ADC2_INP15
     PA5     ------> ADC2_INP19
+    PA6     ------> ADC2_INP3
     PA7     ------> ADC2_INP7
+    PC4     ------> ADC2_INP4
     PC5     ------> ADC2_INP8
     PB0     ------> ADC2_INP9
+    PB1     ------> ADC2_INP5
     */
-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_5|GPIO_PIN_7);
+    HAL_GPIO_DeInit(GPIOC, INLET_TEMPERATURE_Pin|SUSPENSION_FR_Pin|STEERING_ANGLE_Pin);
 
-    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_5);
+    HAL_GPIO_DeInit(GPIOA, OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin|SUSPENSION_FL_Pin
+                          |SUSPENSION_BR_Pin);
 
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_0);
-
-    /* ADC2 DMA DeInit */
-    HAL_DMA_DeInit(adcHandle->DMA_Handle);
+    HAL_GPIO_DeInit(GPIOB, THROTTLE_PEDAL_POSITION_Pin|SUSPENSION_BL_Pin);
 
     /* ADC2 interrupt Deinit */
   /* USER CODE BEGIN ADC2:ADC_IRQn disable */
@@ -482,11 +724,10 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 
     /**ADC3 GPIO Configuration
     PC0     ------> ADC3_INP10
-    PC1     ------> ADC3_INP11
     PC2_C     ------> ADC3_INP0
     PC3_C     ------> ADC3_INP1
     */
-    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_0|GPIO_PIN_1);
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_0);
 
   /* USER CODE BEGIN ADC3_MspDeInit 1 */
 

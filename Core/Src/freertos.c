@@ -28,6 +28,8 @@
 /* USER CODE BEGIN Includes */
 #define CMSIS
 #include "fdcan.h"
+#include "adc.h"
+#include "tim.h"
 
 extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
 extern void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
@@ -46,7 +48,7 @@ typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define D2_RAM __attribute__((section(".D2_RAM")))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -56,6 +58,14 @@ typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+extern TIM_HandleTypeDef htim1;
+extern ADC_HandleTypeDef hadc1;
+
+volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
+volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
+
+volatile uint32_t test_reading;
+volatile uint32_t pump_speed;
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -227,6 +237,12 @@ const osSemaphoreAttr_t CAN2txS_attributes = {
   .name = "CAN2txS",
   .cb_mem = &CAN2txSControlBlock,
   .cb_size = sizeof(CAN2txSControlBlock),
+/* Definitions for PWMTask */
+osThreadId_t PWMTaskHandle;
+const osThreadAttr_t PWMTask_attributes = {
+  .name = "PWMTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal7,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -240,6 +256,7 @@ void StartDecodeCAN2(void *argument);
 void StartDecodeCAN1(void *argument);
 void StartCreateMsgCAN1(void *argument);
 void StartCreateMsgCAN2(void *argument);
+void StartPWMTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -325,6 +342,8 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of CreateMsgCAN2 */
   CreateMsgCAN2Handle = osThreadNew(StartCreateMsgCAN2, NULL, &CreateMsgCAN2_attributes);
+  /* creation of PWMTask */
+  PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -364,10 +383,32 @@ void StartDefaultTask(void *argument)
 void StartADCTask(void *argument)
 {
   /* USER CODE BEGIN StartADCTask */
+
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
+
+  HAL_TIM_Base_Start(&htim1);
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, ADC12_BUFFER_COUNT);
+
+    sus_fl.avg = (sus_fl.data1 + sus_fl.data2) / 2;
+    sus_fr.avg = (sus_fr.data1 + sus_fr.data2) / 2;
+    sus_bl.avg = (sus_bl.data1 + sus_bl.data2) / 2;
+    sus_br.avg = (sus_br.data1 + sus_br.data2) / 2;
+
+    steering_ang.avg = (steering_ang.data1 + steering_ang.data2) / 2;
+
+    throttle_pos.avg = (throttle_pos.data1 + throttle_pos.data2) / 2;
+
+    inlet_temp.avg = (inlet_temp.data1 + inlet_temp.data2) / 2;
+    outlet_temp.avg = (outlet_temp.data1 + outlet_temp.data2) / 2;
+
+    f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
+    b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
+
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   }
   /* USER CODE END StartADCTask */
 }
@@ -474,6 +515,35 @@ void StartCreateMsgCAN2(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartCreateMsgCAN2 */
+/* USER CODE BEGIN Header_StartPWMTask */
+/**
+* @brief Function implementing the PWMTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPWMTask */
+void StartPWMTask(void *argument)
+{
+  /* USER CODE BEGIN StartPWMTask */
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+
+  uint16_t pump_on = 900; // 900/1000 = 90% duty cycle
+  uint16_t pump_off = 100; // 100/1000 = 10% duty cycle
+  /* Infinite loop */
+  for(;;)
+  {
+    test_reading = inlet_temp.avg;
+
+    if (test_reading >= 60000) {
+      pump_speed = pump_on; 
+    } else if (test_reading <= 10000) {
+      pump_speed = pump_off;
+    }
+
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pump_speed);
+    osDelay(1);
+  }
+  /* USER CODE END StartPWMTask */
 }
 
 /* Private application code --------------------------------------------------*/

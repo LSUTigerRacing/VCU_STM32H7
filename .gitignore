@@ -2,4 +2,5 @@ build
 mx.scratch
 !.settings
 .mxproject
-cmake
+cmake/
+*launch.json*
