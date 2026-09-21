@@ -389,12 +389,12 @@ void StartDecodeCAN2(void *argument)
   for(;;)
   {
     osSemaphoreAcquire(CAN2rxSHandle, 0);
-    status = osMessageQueueGet(CAN2rxQHandle, &msg_raw, 0, 0);
+    status = osMessageQueueGet(CAN2rxQHandle, &msg_raw, NULL, osWaitForever);
     switch(status){
       case osOK:
         dbc = Assign_Signal(&msg_raw);
-      Decode_Message(msg_raw, dbc);
-      osSemaphoreRelease(CAN2rxSHandle);
+        Decode_Message(msg_raw, dbc);
+        osSemaphoreRelease(CAN2rxSHandle);
       break;
 
       default:
@@ -422,12 +422,12 @@ void StartDecodeCAN1(void *argument)
   for(;;)
   {
    osSemaphoreAcquire(CAN1rxSHandle, 0);
-    status = osMessageQueueGet(CAN1rxQHandle, &msg_raw, 0, 0);
+    status = osMessageQueueGet(CAN1rxQHandle, &msg_raw, NULL, osWaitForever);
     switch(status){
       case osOK:
         dbc = Assign_Signal(&msg_raw);
-      Decode_Message(msg_raw, dbc);
-      osSemaphoreRelease(CAN1rxSHandle);
+        Decode_Message(msg_raw, dbc);
+        osSemaphoreRelease(CAN1rxSHandle);
       break;
 
       default:
@@ -451,6 +451,7 @@ void StartCreateMsgCAN1(void *argument)
   /* Infinite loop */
   for(;;)
   {
+    //implement if needed
     osDelay(1);
   }
   /* USER CODE END StartCreateMsgCAN1 */
@@ -469,6 +470,7 @@ void StartCreateMsgCAN2(void *argument)
   /* Infinite loop */
   for(;;)
   {
+    //implement if needed
     osDelay(1);
   }
   /* USER CODE END StartCreateMsgCAN2 */

@@ -55,6 +55,8 @@
 #define ROTOR1_MSG_INDEX 13
 #define ROTOR2_MSG_INDEX 14
 
+extern osThreadId_t DecodeCAN1Handle;
+extern osThreadId_t DecodeCAN2Handle;
 extern osMessageQueueId_t CAN1rxQHandle;
 extern osMessageQueueId_t CAN1txQHandle;
 extern osMessageQueueId_t CAN2rxQHandle;
@@ -81,7 +83,7 @@ static uint8_t fdcan1_busy;
 
 CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
 CAN_Decoded_Values* Get_Message(uint16_t id);
-static void Store_Message(CAN_Decoded msg);
+static void Store_Message(CAN_Decoded msg, uint8_t sig_count);
 /* USER CODE END 0 */
 
 FDCAN_HandleTypeDef hfdcan1;
@@ -123,8 +125,8 @@ void MX_FDCAN1_Init(void)
   hfdcan1.Init.RxBuffersNbr = 0;
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.TxEventsNbr = 0;
-  hfdcan1.Init.TxBuffersNbr = 32;
-  hfdcan1.Init.TxFifoQueueElmtsNbr = 0;
+  hfdcan1.Init.TxBuffersNbr = 2;
+  hfdcan1.Init.TxFifoQueueElmtsNbr = 2;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_QUEUE_OPERATION;
   hfdcan1.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
@@ -471,17 +473,20 @@ void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, ui
 
 /// @brief Stores decoded CAN message in CAN_Storage array
 /// @param msg Decoded CAN message
-static void Store_Message(CAN_Decoded msg){
+static void Store_Message(CAN_Decoded msg, uint8_t sig_count){
+  uint8_t can_index;
   switch(msg.id){
-    case BMS1_MSG_INDEX:
-      CAN_Storage[BMS1_MSG_INDEX].id = msg.id;
-      CAN_Storage[BMS1_MSG_INDEX].decoded = &msg.decoded[0];
+    case 0x6B1:
+      can_index = BMS1_MSG_INDEX;
       break;
 
     default:
-      msg.id = 999; //untracked message
+      return; //untracked message
   }
 
+  for(uint8_t i = 0; i < sig_count; i++){
+    CAN_Storage[can_index].decoded[i] = msg.decoded[i];
+  }
 }
 
 /// @brief Assigns signals to the message and should be called after recieving message 
@@ -625,7 +630,7 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
   }
   ret.id = msg.id;
   ret.decoded = values;
-  Store_Message(ret);
+  Store_Message(ret, dbc.sig_count);
 }
 
 CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index){
@@ -647,7 +652,7 @@ CAN_Decoded_Values* Get_Message(uint16_t id){
   //implement actual messages
   switch(id){
     case 0x6B1:
-      return CAN_Storage[BMS1_MSG_INDEX].decoded;
+      ret = &CAN_Storage[BMS1_MSG_INDEX].decoded[0];
 
     default:
       ret[0].uint8 = 6;
@@ -657,8 +662,8 @@ CAN_Decoded_Values* Get_Message(uint16_t id){
 }
 
 /// @brief Used for CAN1 bus transmissions with queue mode 
-/// @param hfdcan 
-/// @param BufferIndexes 
+/// @param hfdcan Pointer to CAN instance
+/// @param BufferIndexes Buffers that have completed their transmission
 void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes){
   HAL_StatusTypeDef status;
   FDCAN_TxHeaderTypeDef header;
@@ -711,7 +716,7 @@ void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan){
 
   switch(status){
     case HAL_OK:
-
+    
     break;
 
     case HAL_BUSY:

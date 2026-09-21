@@ -34,6 +34,8 @@ extern "C" {
 #ifndef CMSIS
 #define CMSIS
 #include "cmsis_os2.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #endif
 uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size);
 /* USER CODE END Includes */
