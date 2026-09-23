@@ -237,6 +237,7 @@ const osSemaphoreAttr_t CAN2txS_attributes = {
   .name = "CAN2txS",
   .cb_mem = &CAN2txSControlBlock,
   .cb_size = sizeof(CAN2txSControlBlock),
+};
 /* Definitions for PWMTask */
 osThreadId_t PWMTaskHandle;
 const osThreadAttr_t PWMTask_attributes = {
@@ -515,6 +516,7 @@ void StartCreateMsgCAN2(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartCreateMsgCAN2 */
+}
 /* USER CODE BEGIN Header_StartPWMTask */
 /**
 * @brief Function implementing the PWMTask thread.
