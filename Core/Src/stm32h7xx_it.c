@@ -236,6 +236,9 @@ void FDCAN2_IT1_IRQHandler(void)
   /* USER CODE BEGIN FDCAN2_IT1_IRQn 1 */
 
   /* USER CODE END FDCAN2_IT1_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM2 global interrupt.
   */
 void TIM2_IRQHandler(void)

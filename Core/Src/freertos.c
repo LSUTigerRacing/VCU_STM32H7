@@ -77,9 +77,14 @@ const osThreadAttr_t defaultTask_attributes = {
 };
 /* Definitions for ADCTask */
 osThreadId_t ADCTaskHandle;
+uint32_t ADCTaskBuffer[ 128 ];
+osStaticThreadDef_t ADCTaskControlBlock;
 const osThreadAttr_t ADCTask_attributes = {
   .name = "ADCTask",
-  .stack_size = 128 * 4,
+  .cb_mem = &ADCTaskControlBlock,
+  .cb_size = sizeof(ADCTaskControlBlock),
+  .stack_mem = &ADCTaskBuffer[0],
+  .stack_size = sizeof(ADCTaskBuffer),
   .priority = (osPriority_t) osPriorityAboveNormal3,
 };
 /* Definitions for DecodeCAN2 */
@@ -129,6 +134,18 @@ const osThreadAttr_t CreateMsgCAN2_attributes = {
   .stack_mem = &CreateMsgCAN2Buffer[0],
   .stack_size = sizeof(CreateMsgCAN2Buffer),
   .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for PWMTask */
+osThreadId_t PWMTaskHandle;
+uint32_t PWMTaskBuffer[ 128 ];
+osStaticThreadDef_t PWMTaskControlBlock;
+const osThreadAttr_t PWMTask_attributes = {
+  .name = "PWMTask",
+  .cb_mem = &PWMTaskControlBlock,
+  .cb_size = sizeof(PWMTaskControlBlock),
+  .stack_mem = &PWMTaskBuffer[0],
+  .stack_size = sizeof(PWMTaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal4,
 };
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
@@ -237,12 +254,6 @@ const osSemaphoreAttr_t CAN2txS_attributes = {
   .name = "CAN2txS",
   .cb_mem = &CAN2txSControlBlock,
   .cb_size = sizeof(CAN2txSControlBlock),
-/* Definitions for PWMTask */
-osThreadId_t PWMTaskHandle;
-const osThreadAttr_t PWMTask_attributes = {
-  .name = "PWMTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityAboveNormal7,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -342,6 +353,7 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of CreateMsgCAN2 */
   CreateMsgCAN2Handle = osThreadNew(StartCreateMsgCAN2, NULL, &CreateMsgCAN2_attributes);
+
   /* creation of PWMTask */
   PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
 
@@ -515,6 +527,8 @@ void StartCreateMsgCAN2(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartCreateMsgCAN2 */
+}
+
 /* USER CODE BEGIN Header_StartPWMTask */
 /**
 * @brief Function implementing the PWMTask thread.
@@ -527,15 +541,16 @@ void StartPWMTask(void *argument)
   /* USER CODE BEGIN StartPWMTask */
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 
-  uint16_t pump_on = 900; // 900/1000 = 90% duty cycle
-  uint16_t pump_off = 100; // 100/1000 = 10% duty cycle
+  uint16_t pump_on = 250; // 250/1000 = 25% duty cycle
+  uint16_t pump_off = 50; // 50/1000 = 5% duty cycle
+
   /* Infinite loop */
   for(;;)
   {
     test_reading = inlet_temp.avg;
 
-    if (test_reading >= 60000) {
-      pump_speed = pump_on; 
+    if (test_reading >= 50000) {
+      pump_speed = pump_on;
     } else if (test_reading <= 10000) {
       pump_speed = pump_off;
     }
