@@ -77,13 +77,13 @@ typedef struct{
   CAN_Decoded_Values *decoded;
 }CAN_Decoded;
 
-static CAN_Decoded CAN_Storage[50];
+static volatile CAN_Decoded CAN_Storage[50];
 static uint8_t fdcan0_busy;
 static uint8_t fdcan1_busy;
 
 CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
 CAN_Decoded_Values* Get_Message(uint16_t id);
-static volatile void Store_Message(CAN_Decoded msg, uint8_t sig_count);
+static void Store_Message(CAN_Decoded msg, uint8_t sig_count);
 /* USER CODE END 0 */
 
 FDCAN_HandleTypeDef hfdcan1;
