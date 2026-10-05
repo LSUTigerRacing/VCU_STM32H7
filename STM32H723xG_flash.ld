@@ -249,6 +249,14 @@ SECTIONS
     . = ALIGN (4);
   } >RAM_D2
 
+  .D1_RAM (NOLOAD) :
+  {
+    . = ALIGN(32);
+    *(.D1_RAM)
+    *(.D1_RAM*)
+    . = ALIGN (32);
+  } >RAM_D1
+
   /* Remove information from the standard libraries */
   /DISCARD/ :
   {

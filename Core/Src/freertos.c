@@ -30,6 +30,8 @@
 #include "fdcan.h"
 #include "adc.h"
 #include "tim.h"
+#include "fatfs.h"
+#include "ff.h"
 
 extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
 extern void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
@@ -44,11 +46,18 @@ typedef StaticSemaphore_t osStaticMutexDef_t;
 typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE BEGIN PTD */
 
+typedef struct {
+  uint32_t timestamp;
+  uint32_t throttle;
+  uint32_t f_brake;
+  uint32_t steering;
+} TelemetryData_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define D2_RAM __attribute__((section(".D2_RAM")))
+#define D1_RAM __attribute__((section(".D1_RAM")))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -60,6 +69,7 @@ typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE BEGIN Variables */
 extern TIM_HandleTypeDef htim1;
 extern ADC_HandleTypeDef hadc1;
+extern FATFS SDFatFS;
 
 volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
 volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
@@ -67,6 +77,9 @@ volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 volatile uint32_t test_reading;
 volatile uint32_t pump_speed;
 
+volatile D1_RAM char sd_write_buffer[128] __attribute((aligned(32)));
+
+FIL LogFile;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -147,6 +160,18 @@ const osThreadAttr_t PWMTask_attributes = {
   .stack_size = sizeof(PWMTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal4,
 };
+/* Definitions for LoggingTask */
+osThreadId_t LoggingTaskHandle;
+uint32_t LoggingTaskBuffer[ 1024 ];
+osStaticThreadDef_t LoggingTaskControlBlock;
+const osThreadAttr_t LoggingTask_attributes = {
+  .name = "LoggingTask",
+  .cb_mem = &LoggingTaskControlBlock,
+  .cb_size = sizeof(LoggingTaskControlBlock),
+  .stack_mem = &LoggingTaskBuffer[0],
+  .stack_size = sizeof(LoggingTaskBuffer),
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
 uint8_t CAN1rxQBuffer[ 1024 * sizeof( uint8_t ) ];
@@ -190,6 +215,17 @@ const osMessageQueueAttr_t CAN2txQ_attributes = {
   .cb_size = sizeof(CAN2txQControlBlock),
   .mq_mem = &CAN2txQBuffer,
   .mq_size = sizeof(CAN2txQBuffer)
+};
+/* Definitions for LogQ */
+osMessageQueueId_t LogQHandle;
+uint8_t LogQBuffer[ 1024 * sizeof( uint32_t ) ];
+osStaticMessageQDef_t LogQControlBlock;
+const osMessageQueueAttr_t LogQ_attributes = {
+  .name = "LogQ",
+  .cb_mem = &LogQControlBlock,
+  .cb_size = sizeof(LogQControlBlock),
+  .mq_mem = &LogQBuffer,
+  .mq_size = sizeof(LogQBuffer)
 };
 /* Definitions for CAN1txM */
 osMutexId_t CAN1txMHandle;
@@ -268,6 +304,7 @@ void StartDecodeCAN1(void *argument);
 void StartCreateMsgCAN1(void *argument);
 void StartCreateMsgCAN2(void *argument);
 void StartPWMTask(void *argument);
+void StartLoggingTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -331,6 +368,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN2txQ */
   CAN2txQHandle = osMessageQueueNew (128, sizeof(uint8_t), &CAN2txQ_attributes);
 
+  /* creation of LogQ */
+  LogQHandle = osMessageQueueNew (1024, sizeof(uint32_t), &LogQ_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -356,6 +396,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of PWMTask */
   PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
+
+  /* creation of LoggingTask */
+  LoggingTaskHandle = osThreadNew(StartLoggingTask, NULL, &LoggingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -400,6 +443,8 @@ void StartADCTask(void *argument)
 
   HAL_TIM_Base_Start(&htim1);
 
+  TelemetryData_t currentData;
+
   /* Infinite loop */
   for(;;)
   {
@@ -419,6 +464,13 @@ void StartADCTask(void *argument)
 
     f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
     b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
+
+    currentData.timestamp = HAL_GetTick();
+    currentData.throttle = throttle_pos.avg;
+    currentData.f_brake = f_brake_press.avg;
+    currentData.steering = steering_ang.avg;
+
+    osMessageQueuePut(LogQHandle, &currentData, 0, 0);
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   }
@@ -559,6 +611,54 @@ void StartPWMTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartPWMTask */
+}
+
+/* USER CODE BEGIN Header_StartLoggingTask */
+/**
+* @brief Function implementing the LoggingTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartLoggingTask */
+void StartLoggingTask(void *argument)
+{
+  /* USER CODE BEGIN StartLoggingTask */
+  FRESULT f_res;
+    UINT bytesWritten;
+    TelemetryData_t rxData;
+    
+    // 1. Mount the filesystem
+    if (f_mount(&SDFatFS, "", 1) != FR_OK) {
+        osThreadExit(); 
+    }
+
+    // 2. Open static file (For date-time naming, read RTC and use snprintf here)
+    if (f_open(&LogFile, "vcu_telemetry.csv", FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
+        osThreadExit();
+    }
+  /* Infinite loop */
+  for(;;)
+  {
+    if (osMessageQueueGet(LogQHandle, &rxData, NULL, osWaitForever) == osOK) 
+        {
+            // 4. Format into AXI SRAM buffer
+            int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu,%lu,%lu,%lu\n", 
+                               rxData.timestamp, rxData.throttle, 
+                               rxData.f_brake, rxData.steering);
+
+            // 5. Critical H7 Step: Push CPU D-Cache to physical RAM before IDMA takes over
+            SCB_CleanDCache_by_Addr((uint32_t*)sd_write_buffer, ((len + 31) / 32) * 32); 
+
+            // 6. Execute IDMA hardware write
+            f_res = f_write(&LogFile, sd_write_buffer, len, &bytesWritten);
+
+            // 7. Force write to non-volatile SD storage to survive VCU brownouts
+            if (f_res == FR_OK) {
+                f_sync(&LogFile);
+            }
+        }
+  }
+  /* USER CODE END StartLoggingTask */
 }
 
 /* Private application code --------------------------------------------------*/
