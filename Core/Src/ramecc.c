@@ -25,6 +25,7 @@
 /* USER CODE END 0 */
 
 RAMECC_HandleTypeDef hramecc1_m1;
+RAMECC_HandleTypeDef hramecc2_m3;
 
 /* RAMECC init function */
 void MX_RAMECC_Init(void)
@@ -42,6 +43,14 @@ void MX_RAMECC_Init(void)
   */
   hramecc1_m1.Instance = RAMECC1_Monitor1;
   if (HAL_RAMECC_Init(&hramecc1_m1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initialize RAMECC2 M3 : FDCAN RAM
+  */
+  hramecc2_m3.Instance = RAMECC2_Monitor3;
+  if (HAL_RAMECC_Init(&hramecc2_m3) != HAL_OK)
   {
     Error_Handler();
   }
