@@ -18,10 +18,13 @@
   */
 /* USER CODE END Header */
 
+
 /* Includes ------------------------------------------------------------------*/
 #include "gpio.h"
 
 /* USER CODE BEGIN 0 */
+//Enable RCC Clock for GPIO
+
 
 /* USER CODE END 0 */
 
@@ -29,6 +32,11 @@
 /* Configure GPIO                                                             */
 /*----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
+//Periphelal: GPIO is the arm, just their
+//DRIVER: Tell the GPIO what to do, the brain
+
+
+
 
 /* USER CODE END 1 */
 
@@ -39,7 +47,8 @@
         * EVENT_OUT
         * EXTI
 */
-void MX_GPIO_Init(void)
+
+void MX_GPIO_Init(void) //DO NOT TOUCH
 {
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -60,10 +69,8 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, DigOut_3_Pin|DigOut_2_Pin|DigOut_1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : SD_CD_Pin SD_WP_Pin SD_Detect_Pin DigIn_12_Pin
-                           DigIn_8_Pin */
-  GPIO_InitStruct.Pin = SD_CD_Pin|SD_WP_Pin|SD_Detect_Pin|DigIn_12_Pin
-                          |DigIn_8_Pin;
+  /*Configure GPIO pins : SD_Detect_Pin DigIn_12_Pin DigIn_8_Pin */
+  GPIO_InitStruct.Pin = SD_Detect_Pin|DigIn_12_Pin|DigIn_8_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
@@ -103,9 +110,9 @@ void MX_GPIO_Init(void)
 
 }
 
-/* USER CODE BEGIN 2 */
+/* USER CODE BEGIN 2 *///Will create unused argument compliation warnin
 volatile uint32_t button_state = 0;
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
+void HAL_GPIO_EXTI_CALLBACK(uint16_t GPIO_PIN)
 {
 
   static uint32_t btn_last[2] = {[0]=0, [1]=1};
@@ -118,8 +125,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
       if (now-btn_last[btn_idx] < DEBOUNCE_MS) break;
 
       if(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
-        button_state |= BTN_POWER_MODE;
-        break;
+        button_state |= BTN_POWER_MODE
       }
 
       else if (HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_6) == GPIO_PIN_SET){
@@ -146,5 +152,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
   btn_last[btn_idx] = now;
 
 }
+
 
 /* USER CODE END 2 */

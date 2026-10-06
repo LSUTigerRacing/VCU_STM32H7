@@ -60,10 +60,8 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, DigOut_3_Pin|DigOut_2_Pin|DigOut_1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : SD_CD_Pin SD_WP_Pin SD_Detect_Pin DigIn_12_Pin
-                           DigIn_8_Pin */
-  GPIO_InitStruct.Pin = SD_CD_Pin|SD_WP_Pin|SD_Detect_Pin|DigIn_12_Pin
-                          |DigIn_8_Pin;
+  /*Configure GPIO pins : SD_Detect_Pin DigIn_12_Pin DigIn_8_Pin */
+  GPIO_InitStruct.Pin = SD_Detect_Pin|DigIn_12_Pin|DigIn_8_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
@@ -104,47 +102,5 @@ void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 2 */
-volatile uint32_t button_state = 0;
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
-{
-
-  static uint32_t btn_last[2] = {[0]=0, [1]=1};
-  uint32_t now = HAL_GetTick();
-  int btn_idx = 0;
-
-  switch(GPIO_PIN){
-    case GPIO_PIN_6:
-    {
-      if (now-btn_last[btn_idx] < DEBOUNCE_MS) break;
-
-      if(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
-        button_state |= BTN_POWER_MODE;
-        break;
-      }
-
-      else if (HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_6) == GPIO_PIN_SET){
-        button_state |= BTN_HV_CHECK;
-      break;
-    }
-  }
-    case GPIO_PIN_9 :
-    {
-      if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
-      button_state |= BTN_RTD;
-      break;
-    }
-
-    case GPIO_PIN_10:
-    {
-      if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
-      button_state |= BTN_WATER_PUMP;
-      break;
-    }
-
-    default: break;
-  }
-  btn_last[btn_idx] = now;
-
-}
 
 /* USER CODE END 2 */

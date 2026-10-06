@@ -1,0 +1,8 @@
+build
+mx.scratch
+!.settings
+.mxproject
+cmake/
+*launch.json*
+.settings
+.vscode

@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    gpio.h
+  * @file    tim.h
   * @brief   This file contains all the function prototypes for
-  *          the gpio.c file
+  *          the tim.c file
   ******************************************************************************
   * @attention
   *
@@ -18,8 +18,8 @@
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __GPIO_H__
-#define __GPIO_H__
+#ifndef __TIM_H__
+#define __TIM_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,14 +32,39 @@ extern "C" {
 
 /* USER CODE END Includes */
 
+extern TIM_HandleTypeDef htim1;
+
+extern TIM_HandleTypeDef htim2;
+
+extern TIM_HandleTypeDef htim3;
+
+extern TIM_HandleTypeDef htim4;
+
+extern TIM_HandleTypeDef htim5;
+
+extern TIM_HandleTypeDef htim12;
+
+extern TIM_HandleTypeDef htim13;
+
+extern TIM_HandleTypeDef htim14;
+
+extern TIM_HandleTypeDef htim15;
+
 /* USER CODE BEGIN Private defines */
-#define BTN_POWER_MODE BIT0
-#define BTN_RTD        BIT1
-#define BTN_WATER_PUMP BIT2
-#define BTN_HV_CHECK   BIT3
+
 /* USER CODE END Private defines */
 
-void MX_GPIO_Init(void);
+void MX_TIM1_Init(void);
+void MX_TIM2_Init(void);
+void MX_TIM3_Init(void);
+void MX_TIM4_Init(void);
+void MX_TIM5_Init(void);
+void MX_TIM12_Init(void);
+void MX_TIM13_Init(void);
+void MX_TIM14_Init(void);
+void MX_TIM15_Init(void);
+
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* USER CODE BEGIN Prototypes */
 
@@ -48,4 +73,6 @@ void MX_GPIO_Init(void);
 #ifdef __cplusplus
 }
 #endif
-#endif /*__ GPIO_H__ */
+
+#endif /* __TIM_H__ */
+

@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    gpio.h
+  * @file    usart.h
   * @brief   This file contains all the function prototypes for
-  *          the gpio.c file
+  *          the usart.c file
   ******************************************************************************
   * @attention
   *
@@ -18,8 +18,8 @@
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __GPIO_H__
-#define __GPIO_H__
+#ifndef __USART_H__
+#define __USART_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,14 +32,13 @@ extern "C" {
 
 /* USER CODE END Includes */
 
+extern UART_HandleTypeDef huart2;
+
 /* USER CODE BEGIN Private defines */
-#define BTN_POWER_MODE BIT0
-#define BTN_RTD        BIT1
-#define BTN_WATER_PUMP BIT2
-#define BTN_HV_CHECK   BIT3
+
 /* USER CODE END Private defines */
 
-void MX_GPIO_Init(void);
+void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
@@ -48,4 +47,6 @@ void MX_GPIO_Init(void);
 #ifdef __cplusplus
 }
 #endif
-#endif /*__ GPIO_H__ */
+
+#endif /* __USART_H__ */
+

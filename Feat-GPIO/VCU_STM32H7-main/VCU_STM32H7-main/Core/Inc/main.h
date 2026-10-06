@@ -85,10 +85,6 @@ void Error_Handler(void);
 #define THROTTLE_PEDAL_POSITION_GPIO_Port GPIOB
 #define SUSPENSION_BL_Pin GPIO_PIN_1
 #define SUSPENSION_BL_GPIO_Port GPIOB
-#define SD_CD_Pin GPIO_PIN_10
-#define SD_CD_GPIO_Port GPIOD
-#define SD_WP_Pin GPIO_PIN_11
-#define SD_WP_GPIO_Port GPIOD
 #define SD_Detect_Pin GPIO_PIN_14
 #define SD_Detect_GPIO_Port GPIOD
 #define DigOut_5_Pin GPIO_PIN_15
@@ -121,6 +117,7 @@ void Error_Handler(void);
 #define DigIn_2_GPIO_Port GPIOE
 #define DigIn_1_Pin GPIO_PIN_1
 #define DigIn_1_GPIO_Port GPIOE
+
 
 #define DEBOUNCE_MS 50
 /* USER CODE BEGIN Private defines */
