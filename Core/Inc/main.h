@@ -118,6 +118,7 @@ void Error_Handler(void);
 #define DigIn_1_Pin GPIO_PIN_1
 #define DigIn_1_GPIO_Port GPIOE
 
+#define DEBOUNCE_MS 50
 /* USER CODE BEGIN Private defines */
 #define BIT0 (1ULL << 0)
 #define BIT1 (1ULL << 1)

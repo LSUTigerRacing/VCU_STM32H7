@@ -62,6 +62,8 @@
 void SystemClock_Config(void);
 static void MPU_Config(void);
 void MX_FREERTOS_Init(void);
+
+extern volatile uint32_t button_state;
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -79,6 +81,16 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+
+
+  /* USER CODE END 3 */
+
+
+
 
   /* USER CODE END 1 */
 
@@ -138,11 +150,36 @@ int main(void)
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
+
   /* USER CODE BEGIN WHILE */
-  while (1)
+  while(1)
   {
     /* USER CODE END WHILE */
 
+    if (button_state & BTN_POWER_MODE)
+
+       {button_state &= ~BTN_POWER_MODE;
+
+        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_6);
+       }
+
+       if (button_state & BTN_RTD)
+       {
+        button_state &= ~BTN_RTD;
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_9);
+       }
+
+       if(button_state & BTN_WATER_PUMP)
+       {
+        button_state &= BTN_WATER_PUMP;
+        HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_10);
+       }
+
+       if(button_state & BTN_HV_CHECK)
+       {
+        button_state &= BTN_HV_CHECK;
+        HAL_GPIO_TogglePin(GPIOC,GPIO_PIN_6);
+       }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
