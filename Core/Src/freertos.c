@@ -42,6 +42,7 @@ typedef StaticTask_t osStaticThreadDef_t;
 typedef StaticQueue_t osStaticMessageQDef_t;
 typedef StaticSemaphore_t osStaticMutexDef_t;
 typedef StaticSemaphore_t osStaticSemaphoreDef_t;
+typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -255,6 +256,22 @@ const osSemaphoreAttr_t CAN2txS_attributes = {
   .cb_mem = &CAN2txSControlBlock,
   .cb_size = sizeof(CAN2txSControlBlock),
 };
+/* Definitions for RTD */
+osEventFlagsId_t RTDHandle;
+osStaticEventGroupDef_t RTDControlBlock;
+const osEventFlagsAttr_t RTD_attributes = {
+  .name = "RTD",
+  .cb_mem = &RTDControlBlock,
+  .cb_size = sizeof(RTDControlBlock),
+};
+/* Definitions for BSPD */
+osEventFlagsId_t BSPDHandle;
+osStaticEventGroupDef_t BSPDControlBlock;
+const osEventFlagsAttr_t BSPD_attributes = {
+  .name = "BSPD",
+  .cb_mem = &BSPDControlBlock,
+  .cb_size = sizeof(BSPDControlBlock),
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -360,6 +377,12 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
+
+  /* creation of RTD */
+  RTDHandle = osEventFlagsNew(&RTD_attributes);
+
+  /* creation of BSPD */
+  BSPDHandle = osEventFlagsNew(&BSPD_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
