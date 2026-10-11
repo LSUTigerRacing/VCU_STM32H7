@@ -1,43 +1,30 @@
 /*********************************************************************
-*                     SEGGER Microcontroller GmbH                    *
+*                   (c) SEGGER Microcontroller GmbH                  *
 *                        The Embedded Experts                        *
+*                           www.segger.com                           *
 **********************************************************************
 *                                                                    *
-*       (c) 1995 - 2022 SEGGER Microcontroller GmbH                  *
-*                                                                    *
-*       Internet: segger.com  Support: support_embos@segger.com      *
-*                                                                    *
-**********************************************************************
-*                                                                    *
-*       embOS * Real time operating system                           *
-*                                                                    *
-*       Please note:                                                 *
-*                                                                    *
-*       Knowledge of this file may under no circumstances            *
-*       be used to write a similar product or a real-time            *
-*       operating system for in-house use.                           *
-*                                                                    *
-*       Thank you for your fairness !                                *
-*                                                                    *
-**********************************************************************
-*                                                                    *
-*       OS version: V5.18.0.0                                        *
+*        SEGGER RTT * Real Time Transfer for embedded targets        *
+*                  https://github.com/SEGGERMicro/RTT                *
 *                                                                    *
 **********************************************************************
 
 ---------------------------END-OF-HEADER------------------------------
-File    : SEGGER_RTT.h
 Purpose : Implementation of SEGGER real-time transfer which allows
           real-time communication on targets which support debugger
           memory accesses while the CPU is running.
-Revision: $Rev: 25842 $
+
+          SEGGER strongly recommends to not make any changes to or 
+          modify the source code of this software in order to stay
+          compatible with the RTT protocol and J-Link.
+
 ----------------------------------------------------------------------
 */
 
 #ifndef SEGGER_RTT_H
 #define SEGGER_RTT_H
 
-#include "SEGGER_RTT_Conf.h"
+#include "SEGGER_RTT_ConfDefaults.h"
 
 /*********************************************************************
 *
@@ -75,6 +62,10 @@ Revision: $Rev: 25842 $
       #define _CORE_HAS_RTT_ASM_SUPPORT 1
       #define _CORE_NEEDS_DMB           1
       #define RTT__DMB() __asm volatile ("dmb\n" : : :);
+    #elif (defined(__ARM_ARCH_8_1M_MAIN__))       // Cortex-M85
+      #define _CORE_HAS_RTT_ASM_SUPPORT 1
+      #define _CORE_NEEDS_DMB           1
+      #define RTT__DMB() __asm volatile ("dmb\n" : : :);
     #else
       #define _CORE_HAS_RTT_ASM_SUPPORT 0
     #endif
@@ -105,7 +96,16 @@ Revision: $Rev: 25842 $
       #define _CORE_HAS_RTT_ASM_SUPPORT 1
       #define _CORE_NEEDS_DMB           1
       #define RTT__DMB() __asm volatile ("dmb\n" : : :);
-    #elif ((defined __ARM_ARCH_7A__) || (defined __ARM_ARCH_7R__))  // Cortex-A/R 32-bit ARMv7-A/R
+    #elif (defined __ARM_ARCH_8_1M_MAIN__)        // Cortex-M85
+      #define _CORE_HAS_RTT_ASM_SUPPORT 1
+      #define _CORE_NEEDS_DMB           1
+      #define RTT__DMB() __asm volatile ("dmb\n" : : :);
+    #elif \
+    ((defined __ARM_ARCH_7A__) || (defined __ARM_ARCH_7R__)) || \
+    ((defined __ARM_ARCH_8A__) || (defined __ARM_ARCH_8R__))
+      //
+      // Cortex-A/R ARMv7-A/R & ARMv8-A/R
+      //
       #define _CORE_NEEDS_DMB           1
       #define RTT__DMB() __asm volatile ("dmb\n" : : :);
     #else
@@ -131,7 +131,16 @@ Revision: $Rev: 25842 $
       #define _CORE_HAS_RTT_ASM_SUPPORT 1
       #define _CORE_NEEDS_DMB           1
       #define RTT__DMB() __asm volatile ("dmb\n" : : :);
-    #elif ((defined __ARM_ARCH_7A__) || (defined __ARM_ARCH_7R__))  // Cortex-A/R 32-bit ARMv7-A/R
+    #elif (defined __ARM_ARCH_8_1M_MAIN__)        // Cortex-M85
+      #define _CORE_HAS_RTT_ASM_SUPPORT 1
+      #define _CORE_NEEDS_DMB           1
+      #define RTT__DMB() __asm volatile ("dmb\n" : : :);
+    #elif \
+    (defined __ARM_ARCH_7A__) || (defined __ARM_ARCH_7R__) || \
+    (defined __ARM_ARCH_8A__) || (defined __ARM_ARCH_8R__)
+      //
+      // Cortex-A/R ARMv7-A/R & ARMv8-A/R
+      //
       #define _CORE_NEEDS_DMB           1
       #define RTT__DMB() __asm volatile ("dmb\n" : : :);
     #else
@@ -180,20 +189,17 @@ Revision: $Rev: 25842 $
         #define RTT__DMB() asm VOLATILE ("DMB");
       #endif
     #endif
-    #if (defined __ARM7A__)
-      #if (__CORE__ == __ARM7A__)                      // Cortex-A 32-bit ARMv7-A
-        #define _CORE_NEEDS_DMB 1
-        #define RTT__DMB() asm VOLATILE ("DMB");
-      #endif
+    #if\
+    ((defined __ARM7A__) && (__CORE__ == __ARM7A__)) || \
+    ((defined __ARM7R__) && (__CORE__ == __ARM7R__)) || \
+    ((defined __ARM8A__) && (__CORE__ == __ARM8A__)) || \
+    ((defined __ARM8R__) && (__CORE__ == __ARM8R__))
+      //
+      // Cortex-A/R ARMv7-A/R & ARMv8-A/R
+      //
+       #define _CORE_NEEDS_DMB 1
+      #define RTT__DMB() asm VOLATILE ("DMB");
     #endif
-    #if (defined __ARM7R__)
-      #if (__CORE__ == __ARM7R__)                      // Cortex-R 32-bit ARMv7-R
-        #define _CORE_NEEDS_DMB 1
-        #define RTT__DMB() asm VOLATILE ("DMB");
-      #endif
-    #endif
-// TBD: __ARM8A__ => Cortex-A 64-bit ARMv8-A
-// TBD: __ARM8R__ => Cortex-R 64-bit ARMv8-R
   #else
     //
     // Other compilers
@@ -246,6 +252,7 @@ Revision: $Rev: 25842 $
 #ifndef SEGGER_RTT_ASM  // defined when SEGGER_RTT.h is included from assembly file
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 /*********************************************************************
 *
@@ -365,7 +372,7 @@ unsigned     SEGGER_RTT_GetBytesInBuffer        (unsigned BufferIndex);
 //
 // Function macro for performance optimization
 //
-#define      SEGGER_RTT_HASDATA(n)       (((SEGGER_RTT_BUFFER_DOWN*)((char*)&_SEGGER_RTT.aDown[n] + SEGGER_RTT_UNCACHED_OFF))->WrOff - ((SEGGER_RTT_BUFFER_DOWN*)((char*)&_SEGGER_RTT.aDown[n] + SEGGER_RTT_UNCACHED_OFF))->RdOff)
+#define      SEGGER_RTT_HASDATA(n)       (((SEGGER_RTT_BUFFER_DOWN*)((uintptr_t)&_SEGGER_RTT.aDown[n] + SEGGER_RTT_UNCACHED_OFF))->WrOff - ((SEGGER_RTT_BUFFER_DOWN*)((uintptr_t)&_SEGGER_RTT.aDown[n] + SEGGER_RTT_UNCACHED_OFF))->RdOff)
 
 #if RTT_USE_ASM
   #define SEGGER_RTT_WriteSkipNoLock  SEGGER_RTT_ASM_WriteSkipNoLock
@@ -382,7 +389,7 @@ unsigned     SEGGER_RTT_ReadUpBufferNoLock      (unsigned BufferIndex, void* pDa
 unsigned     SEGGER_RTT_WriteDownBuffer         (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
 unsigned     SEGGER_RTT_WriteDownBufferNoLock   (unsigned BufferIndex, const void* pBuffer, unsigned NumBytes);
 
-#define      SEGGER_RTT_HASDATA_UP(n)    (((SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[n] + SEGGER_RTT_UNCACHED_OFF))->WrOff - ((SEGGER_RTT_BUFFER_UP*)((char*)&_SEGGER_RTT.aUp[n] + SEGGER_RTT_UNCACHED_OFF))->RdOff)   // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
+#define      SEGGER_RTT_HASDATA_UP(n)    (((SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[n] + SEGGER_RTT_UNCACHED_OFF))->WrOff - ((SEGGER_RTT_BUFFER_UP*)((uintptr_t)&_SEGGER_RTT.aUp[n] + SEGGER_RTT_UNCACHED_OFF))->RdOff)   // Access uncached to make sure we see changes made by the J-Link side and all of our changes go into HW directly
 
 /*********************************************************************
 *
@@ -407,6 +414,13 @@ int SEGGER_RTT_vprintf(unsigned BufferIndex, const char * sFormat, va_list * pPa
 #endif
 
 #endif // ifndef(SEGGER_RTT_ASM)
+
+//
+// For some environments, NULL may not be defined until certain headers are included
+//
+#ifndef NULL
+  #define NULL  ((void*)0)
+#endif
 
 /*********************************************************************
 *

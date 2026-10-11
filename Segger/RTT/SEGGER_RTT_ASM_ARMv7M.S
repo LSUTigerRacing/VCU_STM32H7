@@ -1,38 +1,22 @@
 /*********************************************************************
-*                     SEGGER Microcontroller GmbH                    *
+*                   (c) SEGGER Microcontroller GmbH                  *
 *                        The Embedded Experts                        *
+*                           www.segger.com                           *
 **********************************************************************
 *                                                                    *
-*       (c) 1995 - 2022 SEGGER Microcontroller GmbH                  *
-*                                                                    *
-*       Internet: segger.com  Support: support_embos@segger.com      *
-*                                                                    *
-**********************************************************************
-*                                                                    *
-*       embOS * Real time operating system                           *
-*                                                                    *
-*       Please note:                                                 *
-*                                                                    *
-*       Knowledge of this file may under no circumstances            *
-*       be used to write a similar product or a real-time            *
-*       operating system for in-house use.                           *
-*                                                                    *
-*       Thank you for your fairness !                                *
-*                                                                    *
-**********************************************************************
-*                                                                    *
-*       OS version: V5.18.0.0                                        *
+*        SEGGER RTT * Real Time Transfer for embedded targets        *
+*                  https://github.com/SEGGERMicro/RTT                *
 *                                                                    *
 **********************************************************************
 
--------------------------- END-OF-HEADER -----------------------------
-
-File    : SEGGER_RTT_ASM_ARMv7M.S
+---------------------------END-OF-HEADER------------------------------
 Purpose : Assembler implementation of RTT functions for ARMv7M
 
 Additional information:
   This module is written to be assembler-independent and works with
   GCC and clang (Embedded Studio) and IAR.
+
+----------------------------------------------------------------------
 */
 
 #define SEGGER_RTT_ASM      // Used to control processed input from header file
