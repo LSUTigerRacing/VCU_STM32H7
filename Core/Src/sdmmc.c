@@ -49,7 +49,10 @@ void MX_SDMMC1_SD_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN SDMMC1_Init 2 */
-
+  // Need to initialize sdmmc as 1 bit wide and then configure it to 4 bit wide afterward
+  if (HAL_SD_ConfigWideBusOperation(&hsd1, SDMMC_BUS_WIDE_4B) != HAL_OK) {
+    Error_Handler();
+  }
   /* USER CODE END SDMMC1_Init 2 */
 
 }
