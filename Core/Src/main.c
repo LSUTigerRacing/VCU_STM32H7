@@ -34,7 +34,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define CMSIS 1
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,6 +57,7 @@
 
 /* USER CODE BEGIN PV */
 extern FDCAN_HandleTypeDef hfdcan1;
+extern osEventFlagsId_t RTDHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -237,7 +238,7 @@ void BSPD(uint16_t bse, uint16_t apps){
     data[3] = 1;
 
     //turns off drive enable on motor controller
-    Prepare_Message(FDCAN1, 0x24, data, 8);
+    Prepare_Message(&hfdcan1, 0x24, data, 8);
   }
 
 }

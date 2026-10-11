@@ -83,6 +83,8 @@ static uint8_t fdcan1_busy;
 
 CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
 CAN_Decoded_Values* Get_Message(uint16_t id);
+void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
+void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
 static void Store_Message(CAN_Decoded msg, uint8_t sig_count);
 /* USER CODE END 0 */
 
@@ -596,7 +598,6 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
         decode = (float)extract_bits(translated_data,sig->start_bit,size);
         decode *= sig->scale;
         decode += sig->offset;
-        HAL_FDCAN_SetConfig(); 
         values[i].flt = decode;
       }
       else{

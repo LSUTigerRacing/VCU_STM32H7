@@ -26,7 +26,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define CMSIS
 #include "fdcan.h"
 #include "adc.h"
 #include "tim.h"
