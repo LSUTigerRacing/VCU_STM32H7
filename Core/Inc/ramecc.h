@@ -34,6 +34,8 @@ extern "C" {
 
 extern RAMECC_HandleTypeDef hramecc1_m1;
 
+extern RAMECC_HandleTypeDef hramecc2_m3;
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
