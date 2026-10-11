@@ -139,34 +139,6 @@ void HAL_SD_MspDeInit(SD_HandleTypeDef* sdHandle)
 }
 
 /* USER CODE BEGIN 1 */
-//Implement if not using FATFS
-// uint32_t HAL_SD_GetError(SD_HandleTypeDef* hsd){
-  
-// }
 
-// void HAL_SD_TxCpltCallback(SD_HandleTypeDef* hsd){
-
-// }
-
-// void HAL_SD_RxCpltCallback(SD_HandleTypeDef* hsd){
-
-// }
-
-
-// void HAL_SD_ErrorCallback(){
-
-// }
-
-// void HAL_SD_AbortCallback(SD_HandleTypeDef* hsd){
-
-// }
-
-// HAL_StatusTypeDef HAL_SD_ReadBlocks_DMA(SD_HandleTypeDef *hsd, uint8_t *pData,  uint32_t ReadAddr,  uint32_t NumOfBlocks){
-  
-// }
-
-// HAL_StatusTypeDef HAL_SD_WriteBlocks_DMA(SD_HandleTypeDef *hsd, uint8_t *pData, uint32_t BlockAdd, uint32_t NumberOfBlocks){
-  
-// }
 /* USER CODE END 1 */
 

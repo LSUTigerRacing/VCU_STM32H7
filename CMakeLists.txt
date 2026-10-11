@@ -34,14 +34,6 @@ enable_language(C ASM)
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
 
-include_directories(
-    Segger/Config
-    Segger/RTT
-    Segger/FreeRTOSV10.4
-    Segger/SEGGER
-    Segger/SYSVIEW
-)
-
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
@@ -53,12 +45,6 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    Segger/FreeRTOSV10.4/Config/Cortex-M/SEGGER_SYSVIEW_Config_FreeRTOS.c
-    Segger/FreeRTOSV10.4/SEGGER_SYSVIEW_FreeRTOS.c
-    Segger/RTT/SEGGER_RTT_ASM_ARMv7M.S
-    Segger/RTT/SEGGER_RTT_printf.c
-    Segger/RTT/SEGGER_RTT.c
-    Segger/SYSVIEW/SEGGER_SYSVIEW.c
 )
 
 # Add include paths
