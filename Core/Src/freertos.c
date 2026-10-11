@@ -19,6 +19,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
+#include "rtc.h"
+#include "stm32h7xx_hal_rtc.h"
 #include "task.h"
 #include "main.h"
 #include "FreeRTOS.h"
@@ -77,7 +79,7 @@ volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 volatile uint32_t test_reading;
 volatile uint32_t pump_speed;
 
-volatile D1_RAM char sd_write_buffer[128] __attribute((aligned(32)));
+D1_RAM char sd_write_buffer[128] __attribute((aligned(32)));
 
 FIL LogFile;
 /* USER CODE END Variables */
@@ -218,7 +220,7 @@ const osMessageQueueAttr_t CAN2txQ_attributes = {
 };
 /* Definitions for LogQ */
 osMessageQueueId_t LogQHandle;
-uint8_t LogQBuffer[ 1024 * sizeof( uint32_t ) ];
+uint8_t LogQBuffer[ 512 * sizeof( TelemetryData_t ) ];
 osStaticMessageQDef_t LogQControlBlock;
 const osMessageQueueAttr_t LogQ_attributes = {
   .name = "LogQ",
@@ -369,7 +371,7 @@ void MX_FREERTOS_Init(void) {
   CAN2txQHandle = osMessageQueueNew (128, sizeof(uint8_t), &CAN2txQ_attributes);
 
   /* creation of LogQ */
-  LogQHandle = osMessageQueueNew (1024, sizeof(uint32_t), &LogQ_attributes);
+  LogQHandle = osMessageQueueNew (512, sizeof(TelemetryData_t), &LogQ_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -470,9 +472,9 @@ void StartADCTask(void *argument)
     currentData.f_brake = f_brake_press.avg;
     currentData.steering = steering_ang.avg;
 
-    osMessageQueuePut(LogQHandle, &currentData, 0, 0);
-
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    osMessageQueuePut(LogQHandle, &currentData, 0, 0);
   }
   /* USER CODE END StartADCTask */
 }
@@ -623,40 +625,48 @@ void StartPWMTask(void *argument)
 void StartLoggingTask(void *argument)
 {
   /* USER CODE BEGIN StartLoggingTask */
-  FRESULT f_res;
-    UINT bytesWritten;
-    TelemetryData_t rxData;
-    
-    // 1. Mount the filesystem
-    if (f_mount(&SDFatFS, "", 1) != FR_OK) {
-        osThreadExit(); 
-    }
+  UINT bytesWritten;
+  TelemetryData_t rxData;
+  RTC_TimeTypeDef time;
+  RTC_DateTypeDef date;
+  static char dir[16];
+  static char fileName[32];
+  static uint8_t done = 0;
 
-    // 2. Open static file (For date-time naming, read RTC and use snprintf here)
-    if (f_open(&LogFile, "vcu_telemetry.csv", FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
-        osThreadExit();
-    }
+  HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
+
+  snprintf(dir, sizeof(dir), "%02u %02u", date.Month, date.Date);
+
+  if (f_mount(&SDFatFS, "", 1) != FR_OK) osThreadExit();
+
+  // Uncomment this to test more than one log file
+  /*
+  if (f_mkdir(dir) != FR_OK) osThreadExit();
+
+  while (!done) {
+    int i = 0;
+    snprintf(fileName, sizeof(fileName), "log_%02u.csv", i);
+    if (f_open(&LogFile, fileName, FA_CREATE_NEW | FA_WRITE) == FR_OK) done = 1;
+    else i++;
+    if (i == 1000) break;
+  }
+  */
+
+  // If uncommenting the above while loop, comment this out
+  // This f_open tests if file creation even works
+  if (f_open(&LogFile, "log.csv", FA_OPEN_ALWAYS | FA_WRITE | FA_READ) != FR_OK) osThreadExit();
+  
   /* Infinite loop */
   for(;;)
   {
-    if (osMessageQueueGet(LogQHandle, &rxData, NULL, osWaitForever) == osOK) 
-        {
-            // 4. Format into AXI SRAM buffer
-            int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu,%lu,%lu,%lu\n", 
-                               rxData.timestamp, rxData.throttle, 
-                               rxData.f_brake, rxData.steering);
+    int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu %lu %lu", rxData.steering, rxData.throttle, rxData.f_brake);
 
-            // 5. Critical H7 Step: Push CPU D-Cache to physical RAM before IDMA takes over
-            SCB_CleanDCache_by_Addr((uint32_t*)sd_write_buffer, ((len + 31) / 32) * 32); 
-
-            // 6. Execute IDMA hardware write
-            f_res = f_write(&LogFile, sd_write_buffer, len, &bytesWritten);
-
-            // 7. Force write to non-volatile SD storage to survive VCU brownouts
-            if (f_res == FR_OK) {
-                f_sync(&LogFile);
-            }
-        }
+    if (osMessageQueueGet(LogQHandle, &rxData, NULL, osWaitForever) == osOK) {
+      if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK){
+        f_sync(&LogFile);
+      }
+    }
   }
   /* USER CODE END StartLoggingTask */
 }
