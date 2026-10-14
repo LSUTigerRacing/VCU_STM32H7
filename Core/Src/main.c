@@ -35,6 +35,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define CMSIS
+#include "SEGGER_RTT.h"
+#include "SEGGER_SYSVIEW.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -126,6 +128,8 @@ int main(void)
   MX_FATFS_Init();
   MX_OCTOSPI1_Init();
   /* USER CODE BEGIN 2 */
+  SEGGER_RTT_Init();
+  SEGGER_SYSVIEW_Conf();
   /* USER CODE END 2 */
 
   /* Init scheduler */
