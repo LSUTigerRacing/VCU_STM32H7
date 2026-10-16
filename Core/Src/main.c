@@ -36,7 +36,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define CMSIS
-#define ADC
+#include "SEGGER_RTT.h"
+#include "SEGGER_SYSVIEW.h"
+#include "sdmmc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -129,7 +131,9 @@ int main(void)
   MX_OCTOSPI1_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-
+  SEGGER_RTT_Init();
+  SEGGER_SYSVIEW_Conf();
+  MX_SDMMC1_SD_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */

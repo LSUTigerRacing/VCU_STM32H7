@@ -19,8 +19,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "FreeRTOS.h"
-#include "rtc.h"
-#include "stm32h7xx_hal_rtc.h"
 #include "task.h"
 #include "main.h"
 #include "FreeRTOS.h"
@@ -34,6 +32,7 @@
 #include "tim.h"
 #include "fatfs.h"
 #include "ff.h"
+#include "rtc.h"
 
 extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
 extern void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
@@ -172,7 +171,7 @@ const osThreadAttr_t LoggingTask_attributes = {
   .cb_size = sizeof(LoggingTaskControlBlock),
   .stack_mem = &LoggingTaskBuffer[0],
   .stack_size = sizeof(LoggingTaskBuffer),
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityLow1,
 };
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
@@ -638,7 +637,8 @@ void StartLoggingTask(void *argument)
 
   snprintf(dir, sizeof(dir), "%02u %02u", date.Month, date.Date);
 
-  if (f_mount(&SDFatFS, "", 1) != FR_OK) osThreadExit();
+  FRESULT fRes = f_mount(&SDFatFS, "", 1);
+  if (fRes != FR_OK) osThreadExit();
 
   // Uncomment this to test more than one log file
   /*
