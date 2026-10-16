@@ -64,7 +64,7 @@ extern FDCAN_HandleTypeDef hfdcan2;
 extern MDMA_HandleTypeDef hmdma_mdma_channel0_sw_0;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim6;
-
+extern EventGroupHandle_t vcuEventGroup;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */

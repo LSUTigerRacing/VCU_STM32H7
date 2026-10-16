@@ -20,7 +20,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "gpio.h"
-
 /* USER CODE BEGIN 0 */
 
 /* USER CODE END 0 */
@@ -103,7 +102,8 @@ void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 2 */
 volatile uint32_t button_state = 0;
-extern EventGroupHandle_t vcuEventGroup;
+//extern EventGroupHandle_t vcuEventGroup;
+ EventGroupHandle_t vcuEventGroup;
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
 {
 
@@ -118,8 +118,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
       if (now-btn_last[btn_idx] < DEBOUNCE_MS) break;
 
       if(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
-      xEventGroupSetBitsFromISR(vcuEventGroup, BTN_POWER_MODE, &xHigherPriorityTaskWoken);
-        break;
+        xEventGroupSetBitsFromISR(vcuEventGroup, BTN_POWER_MODE, &xHigherPriorityTaskWoken);
+
       }
 
       else if (HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_6) == GPIO_PIN_SET){
