@@ -362,7 +362,7 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   xTaskCreate(
-    vcu_button_tasks,
+    vcu_button_task,
     "VCU_Buttons",
     128,
     NULL,
@@ -573,5 +573,32 @@ void StartPWMTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+void vcu_button_task(void *arg){
+  const EventBits_t ALL_BUTTONS = (BTN_POWER_MODE | BTN_HV_CHECK | BTN_RTD | BTN_WATER_PUMP );
+  for (;;)
+  {
+    EventBits_t uxBits = xEventGroupWaitBits(
+      vcuEventGroup,
+      ALL_BUTTONS,
+      pdTRUE,
+      pdFALSE,
+      portMAX_DELAY
+    );
+    if((uxBits & BTN_BTN_POWER_MODE) != 0){
 
+    }
+
+    if ((uxBits & BTN_HV_CHECK) != 0){
+
+    }
+
+    if ((uxBits & BTN_RTD) !=0) {
+
+    }
+
+    if ((uxBits & BTN_WATER_PUMP) != 0){
+
+    }
+  }
+}
 /* USER CODE END Application */

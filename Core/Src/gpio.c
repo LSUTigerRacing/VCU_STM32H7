@@ -103,12 +103,12 @@ void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 2 */
 volatile uint32_t button_state = 0;
-exter EventGroupHandle_t vcuEventGroup;
+extern EventGroupHandle_t vcuEventGroup;
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
 {
 
   static uint32_t btn_last[2] = {[0]=0, [1]=1};
-  uint32_t now = xTaskGetTickCountFromISR() * portTick_PERIOD_MS;
+  uint32_t now = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
   BaseType_t xHigherPriorityTaskWoken = pdFALSE; //Tells RTOS if waking a task requires immediate context switch
   int btn_idx = 0;
 
@@ -118,32 +118,32 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
       if (now-btn_last[btn_idx] < DEBOUNCE_MS) break;
 
       if(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
-      xEventGroupSetBitsFromISR(vcuEventGroupo, BTN_POWER_MODE, &xHigherPriorityTaskWoken);
+      xEventGroupSetBitsFromISR(vcuEventGroup, BTN_POWER_MODE, &xHigherPriorityTaskWoken);
         break;
       }
 
       else if (HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_6) == GPIO_PIN_SET){
-      xEventGroupSetBitsFromISR(vcuEventGroupo, BTN_HV_CHECK, &xHigherPriorityTaskWoken);
+      xEventGroupSetBitsFromISR(vcuEventGroup, BTN_HV_CHECK, &xHigherPriorityTaskWoken);
       break;
     }
   }
     case GPIO_PIN_9 :
     {
       if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
-    xEventGroupSetBitsFromISR(vcuEventGroupo, BTN_RTD, &xHigherPriorityTaskWoken);
+    xEventGroupSetBitsFromISR(vcuEventGroup, BTN_RTD, &xHigherPriorityTaskWoken);
       break;
     }
 
     case GPIO_PIN_10:
     {
       if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
-      xEventGroupSetBitsFromISR(vcuEventGroupo, BTN_WATER_PUMP, &xHigherPriorityTaskWoken);
+      xEventGroupSetBitsFromISR(vcuEventGroup, BTN_WATER_PUMP, &xHigherPriorityTaskWoken);
       break;
     }
 
     default: break;
   }
-  portYIELD_FROM_ISR(xHigherPriortiyTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   btn_last[btn_idx] = now;
 
 }
