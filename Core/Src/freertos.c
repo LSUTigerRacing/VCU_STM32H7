@@ -278,7 +278,8 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+  //Creation of Event group
+  vcuEventGroup = xEventGroupCreate();
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of CAN1txM */
@@ -295,6 +296,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -359,6 +361,14 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  xTaskCreate(
+    vcu_button_tasks,
+    "VCU_Buttons",
+    128,
+    NULL,
+    tskIDLE_PRIORITY + 1,
+    NULL
+  );
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -485,7 +495,7 @@ void StartDecodeCAN1(void *argument)
 
       default:
       Error_Handler();
-    } 
+    }
     osDelay(1);
   }
   /* USER CODE END StartDecodeCAN1 */
@@ -565,4 +575,3 @@ void StartPWMTask(void *argument)
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-
