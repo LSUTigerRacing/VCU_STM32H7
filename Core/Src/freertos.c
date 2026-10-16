@@ -23,7 +23,7 @@
 #include "main.h"
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
-
+#include "event_group"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define CMSIS
@@ -60,7 +60,7 @@ typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE BEGIN Variables */
 extern TIM_HandleTypeDef htim1;
 extern ADC_HandleTypeDef hadc1;
-
+extern EventGroupHandle_t vcuEventGroup;
 volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
 volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 
@@ -278,7 +278,8 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+  //Creation of Event group
+   vcuEventGroup = xEventGroupCreate();
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of CAN1txM */
@@ -295,6 +296,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -359,6 +361,14 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  xTaskCreate(
+    vcu_button_task,
+    "VCU_Buttons",
+    128,
+    NULL,
+    tskIDLE_PRIORITY + 1,
+    NULL
+  );
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -380,7 +390,17 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+   EventBits_t uxBits = xEventGroupWaitBits(
+    vcuEventGroup,
+    BUTTON_PRESS_BIT,
+    pdTRUE,
+    pdFALSE,
+    portMAX_DELAY
+   );
+   if ((uxBits & BUTTON_PRESS_BIT) != 0)
+  {
+
+  }
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -485,7 +505,7 @@ void StartDecodeCAN1(void *argument)
 
       default:
       Error_Handler();
-    } 
+    }
     osDelay(1);
   }
   /* USER CODE END StartDecodeCAN1 */
@@ -563,6 +583,32 @@ void StartPWMTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+void vcu_button_task(void *arg){
+  const EventBits_t ALL_BUTTONS = (BTN_POWER_MODE | BTN_HV_CHECK | BTN_RTD | BTN_WATER_PUMP );
+  for (;;)
+  {
+    EventBits_t uxBits = xEventGroupWaitBits(
+      vcuEventGroup,
+      ALL_BUTTONS,
+      pdTRUE,
+      pdFALSE,
+      portMAX_DELAY
+    );
+    if((uxBits & BTN_POWER_MODE) != 0){
 
+    }
+
+    if ((uxBits & BTN_HV_CHECK) != 0){
+
+    }
+
+    if ((uxBits & BTN_RTD) !=0) {
+
+    }
+
+    if ((uxBits & BTN_WATER_PUMP) != 0){
+
+    }
+  }
+}
 /* USER CODE END Application */
-
