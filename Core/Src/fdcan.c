@@ -596,7 +596,6 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
         decode = (float)extract_bits(translated_data,sig->start_bit,size);
         decode *= sig->scale;
         decode += sig->offset;
-        HAL_FDCAN_SetConfig(); 
         values[i].flt = decode;
       }
       else{
