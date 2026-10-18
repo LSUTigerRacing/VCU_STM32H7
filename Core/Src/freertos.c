@@ -23,7 +23,7 @@
 #include "main.h"
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
-#include "event_group"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define CMSIS
@@ -147,6 +147,18 @@ const osThreadAttr_t PWMTask_attributes = {
   .stack_size = sizeof(PWMTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal4,
 };
+/* Definitions for GPIOTask */
+osThreadId_t GPIOTaskHandle;
+uint32_t GPIOTaskBuffer[ 128 ];
+osStaticThreadDef_t GPIOTaskControlBlock;
+const osThreadAttr_t GPIOTask_attributes = {
+  .name = "GPIOTask",
+  .cb_mem = &GPIOTaskControlBlock,
+  .cb_size = sizeof(GPIOTaskControlBlock),
+  .stack_mem = &GPIOTaskBuffer[0],
+  .stack_size = sizeof(GPIOTaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal3,
+};
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
 uint8_t CAN1rxQBuffer[ 1024 * sizeof( uint8_t ) ];
@@ -268,6 +280,7 @@ void StartDecodeCAN1(void *argument);
 void StartCreateMsgCAN1(void *argument);
 void StartCreateMsgCAN2(void *argument);
 void StartPWMTask(void *argument);
+void StartTaskGPIO(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -279,7 +292,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
   //Creation of Event group
-   vcuEventGroup = xEventGroupCreate();
+   vcuEventGroup = osEventxNew();
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of CAN1txM */
@@ -359,16 +372,12 @@ void MX_FREERTOS_Init(void) {
   /* creation of PWMTask */
   PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
 
+  /* creation of GPIOTask */
+  GPIOTaskHandle = osThreadNew(StartTaskGPIO, NULL, &GPIOTask_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  xTaskCreate(
-    vcu_button_task,
-    "VCU_Buttons",
-    128,
-    NULL,
-    tskIDLE_PRIORITY + 1,
-    NULL
-  );
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -390,17 +399,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-   EventBits_t uxBits = xEventGroupWaitBits(
-    vcuEventGroup,
-    BUTTON_PRESS_BIT,
-    pdTRUE,
-    pdFALSE,
-    portMAX_DELAY
-   );
-   if ((uxBits & BUTTON_PRESS_BIT) != 0)
-  {
-
-  }
+  osDelay(1);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -581,6 +580,24 @@ void StartPWMTask(void *argument)
   /* USER CODE END StartPWMTask */
 }
 
+/* USER CODE BEGIN Header_StartTaskGPIO */
+/**
+* @brief Function implementing the GPIOTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskGPIO */
+void StartTaskGPIO(void *argument)
+{
+  /* USER CODE BEGIN StartTaskGPIO */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTaskGPIO */
+}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 void vcu_button_task(void *arg){
@@ -612,3 +629,4 @@ void vcu_button_task(void *arg){
   }
 }
 /* USER CODE END Application */
+
