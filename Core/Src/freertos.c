@@ -23,6 +23,7 @@
 #include "main.h"
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
+#include "event_groups.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -60,7 +61,6 @@ typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 /* USER CODE BEGIN Variables */
 extern TIM_HandleTypeDef htim1;
 extern ADC_HandleTypeDef hadc1;
-extern EventGroupHandle_t vcuEventGroup;
 volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
 volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 
@@ -292,7 +292,6 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
   //Creation of Event group
-   vcuEventGroup = osEventxNew();
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of CAN1txM */
@@ -591,42 +590,74 @@ void StartTaskGPIO(void *argument)
 {
   /* USER CODE BEGIN StartTaskGPIO */
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartTaskGPIO */
-}
-
-/* Private application code --------------------------------------------------*/
-/* USER CODE BEGIN Application */
-void vcu_button_task(void *arg){
-  const EventBits_t ALL_BUTTONS = (BTN_POWER_MODE | BTN_HV_CHECK | BTN_RTD | BTN_WATER_PUMP );
+  EventBits_t uxBits;
   for (;;)
   {
-    EventBits_t uxBits = xEventGroupWaitBits(
+    uxBits = xEventGroupWaitBits(
       vcuEventGroup,
-      ALL_BUTTONS,
+      BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECk,
       pdTRUE,
       pdFALSE,
       portMAX_DELAY
     );
-    if((uxBits & BTN_POWER_MODE) != 0){
 
+    if((uxBits & BTN_POWER_MODE) != 0){
+      //Should Check that power is being delieverd
     }
 
     if ((uxBits & BTN_HV_CHECK) != 0){
+
+      //Check if were above 60V
 
     }
 
     if ((uxBits & BTN_RTD) !=0) {
 
+      //All tests should pass, if any failure we should then iniatiate a shutdow
+
     }
 
     if ((uxBits & BTN_WATER_PUMP) != 0){
-
+      //Pass water through the system
     }
   }
-}
-/* USER CODE END Application */
 
+    osDelay(1);
+
+  /* USER CODE END StartTaskGPIO */
+
+}
+/* Private application code --------------------------------------------------*/
+/* USER CODE BEGIN Application */
+
+/* USER CODE END Application */
+/* if (now-btn_last[btn_idx] < DEBOUNCE_MS) break;
+
+      if(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
+        button_state |= BTN_POWER_MODE;
+        break;
+      }
+
+      else if (HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_6) == GPIO_PIN_SET){
+        button_state |= BTN_HV_CHECK;
+      break;
+    }
+  }
+    case GPIO_PIN_9 :
+    {
+      if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
+      button_state |= BTN_RTD;
+      break;
+    }
+
+    case GPIO_PIN_10:
+    {
+      if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
+      button_state |= BTN_WATER_PUMP;
+      break;
+    }
+
+    default: break;
+  }
+  btn_last[btn_idx] = now;
+*/

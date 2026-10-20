@@ -33,6 +33,7 @@ extern "C" {
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN Private defines */
+#define DEBOUNCE_MS 50
 #define BTN_POWER_MODE BIT0
 #define BTN_RTD        BIT1
 #define BTN_WATER_PUMP BIT2
@@ -49,4 +50,3 @@ void MX_GPIO_Init(void);
 }
 #endif
 #endif /*__ GPIO_H__ */
-
