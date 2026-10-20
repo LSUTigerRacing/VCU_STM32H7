@@ -21,10 +21,16 @@
 #include "adc.h"
 
 /* USER CODE BEGIN 0 */
-
+#include "fdcan.h"
 /* BEGIN Extern*/
 extern osThreadId_t ADCTaskHandle;
+extern osEventFlagsId_t RTDHandle;
 /* END Extern*/
+
+/* BEGIN Defines*/
+#define RTD_ON     BIT0
+#define RTD_BUZZER BIT1
+/* END Defines*/
 
 /* BEGIN Globals*/
 // Suspension shock travel
@@ -82,6 +88,10 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     b_brake_press.data1 = adc12_dma_buf[B_BRAKE] & 0xFFFF; 
     b_brake_press.data2 = adc12_dma_buf[B_BRAKE] >> 16;
 
+  }
+
+  if( (throttle_pos.data1 + throttle_pos.data2)>= ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
+    osEventFlagsClear(RTDHandle, RTD_ON);
   }
 
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;

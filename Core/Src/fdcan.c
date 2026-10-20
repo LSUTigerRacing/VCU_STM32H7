@@ -24,36 +24,36 @@
 
 /* USER CODE BEGIN 0 */
 
-#define BYTE1 8
-#define BYTE2 16
-#define BYTE3 24
-#define BYTE4 32
-#define BYTE5 40
-#define BYTE6 48
-#define BYTE7 56
-#define SIGNED BIT0
-#define BIG_ENDIAN BIT1
-#define TYPE_INT8 BIT2
-#define TYPE_INT16 BIT3
-#define TYPE_INT24 BIT4
-#define TYPE_INT32 BIT5
-#define TYPE_FLOAT BIT6
+#define BYTE1                 8
+#define BYTE2                 16
+#define BYTE3                 24
+#define BYTE4                 32
+#define BYTE5                 40
+#define BYTE6                 48
+#define BYTE7                 56
+#define SIGNED                BIT0
+#define BIG_ENDIAN            BIT1
+#define TYPE_INT8             BIT2
+#define TYPE_INT16            BIT3
+#define TYPE_INT24            BIT4
+#define TYPE_INT32            BIT5
+#define TYPE_FLOAT            BIT6
 
-#define BMS1_MSG_INDEX 0
-#define BMS2_MSG_INDEX 1
-#define DTI1_MSG_INDEX 2
-#define DTI2_MSG_INDEX 3
-#define DIT3_MSG_INDEX 4
-#define DTI4_MSG_INDEX 5
-#define DIT5_MSG_INDEX 6
-#define COOL_IN_MSG_INDEX 7
-#define COOL_OUT_MSG_INDEX 8
-#define COOL_FLOW_MSG_INDEX 9
-#define BRAKE_PSI_MSG_INDEX 10
-#define WHEEL1_MSG_INDEX 11
-#define WHEEL2_MSG_INDEX 12
-#define ROTOR1_MSG_INDEX 13
-#define ROTOR2_MSG_INDEX 14
+#define BMS1_MSG_INDEX        0
+#define BMS2_MSG_INDEX        1
+#define DTI1_MSG_INDEX        2
+#define DTI2_MSG_INDEX        3
+#define DIT3_MSG_INDEX        4
+#define DTI4_MSG_INDEX        5
+#define DIT5_MSG_INDEX        6
+#define COOL_IN_MSG_INDEX     7
+#define COOL_OUT_MSG_INDEX    8
+#define COOL_FLOW_MSG_INDEX   9
+#define BRAKE_PSI_MSG_INDEX   10
+#define WHEEL1_MSG_INDEX      11
+#define WHEEL2_MSG_INDEX      12
+#define ROTOR1_MSG_INDEX      13
+#define ROTOR2_MSG_INDEX      14
 
 extern osThreadId_t DecodeCAN1Handle;
 extern osThreadId_t DecodeCAN2Handle;

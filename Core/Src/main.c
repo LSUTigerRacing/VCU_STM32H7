@@ -44,8 +44,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define HARD_BRAKE 100
-#define GAS_ON     20
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -232,14 +231,14 @@ uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size){
 /// @param apps accelator position 
 /// @return Returns 0 if fail 1 for succeess  
 void BSPD(uint16_t bse, uint16_t apps){
-  if(bse >= HARD_BRAKE && apps >= GAS_ON){
-    uint8_t data[8];
+  // if(bse >= HARD_BRAKE && apps >= GAS_ON){
+  //   uint8_t data[8];
 
-    data[3] = 1;
+  //   data[3] = 1;
 
-    //turns off drive enable on motor controller
-    Prepare_Message(&hfdcan1, 0x24, data, 8);
-  }
+  //   //turns off drive enable on motor controller
+  //   Prepare_Message(FDCAN1, 0x24, data, 8);
+  // }
 
 }
 

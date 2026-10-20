@@ -53,7 +53,8 @@ typedef StaticEventGroup_t osStaticEventGroupDef_t;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define RTD_ON    BIT0
+#define RTD_BUZZ  BIT1
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -146,6 +147,25 @@ const osThreadAttr_t PWMTask_attributes = {
   .stack_mem = &PWMTaskBuffer[0],
   .stack_size = sizeof(PWMTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal4,
+};
+/* Definitions for RTDSM */
+osThreadId_t RTDSMHandle;
+uint32_t StateMachineBuffer[ 2048 ];
+osStaticThreadDef_t StateMachineControlBlock;
+const osThreadAttr_t RTDSM_attributes = {
+  .name = "RTDSM",
+  .cb_mem = &StateMachineControlBlock,
+  .cb_size = sizeof(StateMachineControlBlock),
+  .stack_mem = &StateMachineBuffer[0],
+  .stack_size = sizeof(StateMachineBuffer),
+  .priority = (osPriority_t) osPriorityRealtime,
+};
+/* Definitions for PowerOn */
+osThreadId_t PowerOnHandle;
+const osThreadAttr_t PowerOn_attributes = {
+  .name = "PowerOn",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityRealtime7,
 };
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
@@ -284,6 +304,8 @@ void StartDecodeCAN1(void *argument);
 void StartCreateMsgCAN1(void *argument);
 void StartCreateMsgCAN2(void *argument);
 void StartPWMTask(void *argument);
+void StartRTDSM(void *argument);
+void StartPowerOn(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -373,6 +395,12 @@ void MX_FREERTOS_Init(void) {
   /* creation of PWMTask */
   PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
 
+  /* creation of RTDSM */
+  RTDSMHandle = osThreadNew(StartRTDSM, NULL, &RTDSM_attributes);
+
+  /* creation of PowerOn */
+  PowerOnHandle = osThreadNew(StartPowerOn, NULL, &PowerOn_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -385,6 +413,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
+
   /* USER CODE END RTOS_EVENTS */
 
 }
@@ -464,7 +493,7 @@ void StartDecodeCAN2(void *argument)
   for(;;)
   {
     osSemaphoreAcquire(CAN2rxSHandle, 0);
-    status = osMessageQueueGet(CAN2rxQHandle, &msg_raw, NULL, osWaitForever);
+    status = osMessageQueueGet(CAN2rxQHandle, &msg_raw, NULL, osWaitForever); //change timeout later
     switch(status){
       case osOK:
         dbc = Assign_Signal(&msg_raw);
@@ -497,7 +526,7 @@ void StartDecodeCAN1(void *argument)
   for(;;)
   {
    osSemaphoreAcquire(CAN1rxSHandle, 0);
-    status = osMessageQueueGet(CAN1rxQHandle, &msg_raw, NULL, osWaitForever);
+    status = osMessageQueueGet(CAN1rxQHandle, &msg_raw, NULL, osWaitForever);//change timeout later
     switch(status){
       case osOK:
         dbc = Assign_Signal(&msg_raw);
@@ -546,7 +575,7 @@ void StartCreateMsgCAN2(void *argument)
   for(;;)
   {
     //implement if needed
-    osDelay(1);
+    osDelay(1);  
   }
   /* USER CODE END StartCreateMsgCAN2 */
 }
@@ -581,6 +610,61 @@ void StartPWMTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartPWMTask */
+}
+
+/* USER CODE BEGIN Header_StartRTDSM */
+/**
+* @brief Function implementing the RTDSM thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRTDSM */
+void StartRTDSM(void *argument)
+{
+  /* USER CODE BEGIN StartRTDSM */
+  uint32_t flags;
+  uint8_t can_data[8];
+  /* Infinite loop */
+  for(;;)
+  {
+    osEventFlagsWait(RTDHandle,RTD_ON || RTD_BUZZ, osFlagsNoClear, osWaitForever);
+    flags = osEventFlagsGet(RTDHandle);
+    if(!(flags & RTD_ON)){
+      //CAN message to turn on motor controller
+      can_data[3] = 1;
+      Prepare_Message(&hfdcan1,0x24,can_data,8); 
+    }
+    else if(flags & RTD_BUZZ){
+      // turn buzzer on for 1 second
+
+      osDelay(1000);
+      osEventFlagsClear(RTDHandle, RTD_BUZZ);
+
+      can_data[3] = 0;
+      // turn on motor controller
+      Prepare_Message(&hfdcan1, 0x24, can_data, 8);
+      osEventFlagsSet(RTDHandle, RTD_ON);
+    }
+  }
+  /* USER CODE END StartRTDSM */
+}
+
+/* USER CODE BEGIN Header_StartPowerOn */
+/**
+* @brief Function implementing the PowerOn thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPowerOn */
+void StartPowerOn(void *argument)
+{
+  /* USER CODE BEGIN StartPowerOn */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartPowerOn */
 }
 
 /* Private application code --------------------------------------------------*/

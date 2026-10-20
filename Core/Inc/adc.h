@@ -66,6 +66,8 @@ extern ADC_HandleTypeDef hadc3;
 #define F_BRAKE 8
 #define B_BRAKE 9
 
+#define HARD_BRAKE 2000
+#define ACCEL      500
 /* END Defines*/
 
 /* BEGIN Typedef */
