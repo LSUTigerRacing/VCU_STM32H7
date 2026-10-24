@@ -102,31 +102,54 @@ void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 2 */
-volatile uint32_t button_state = 0;
-//extern EventGroupHandle_t vcuEventGroup;
+//volatile uint32_t button_state = 0;
+extern EventGroupHandle_t vcuEventGroup;
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
 {
-
+//Can adjust later, this is to limit timestamp conflict
+static uint32_t last_time_6 = 0;
+static uint32_t last_time_9 = 0;
+static uint32_t last_time_10 = 0;
+uint32_t now = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
 BaseType_t xHigherPriorityTaskWoken = pdFALSE; //Tells RTOS if waking a task requires immediate context switch
 
-if (GPIO_PIN == BTN_HV_CHECK){
-  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_HV_CHECK, #xHigerPriorityTaskWoken);
+switch(GPIO_PIN){
+  case GPIO_PIN_6:
+  {
+    if(now - last_time_6 < DEBOUNCE_MS) break;
+    last_time_6 = now;
+  if (HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
+  //This replaces the button_state
+  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_POWER_MODE,&xHigherPriorityTaskWoken);
+  }
+  else if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6) == GPIO_PIN_SET){
+xEventGroupSetBitsFromISR(vcuEventGroup, BTN_HV_CHECK,&xHigherPriorityTaskWoken);
+}
+  break;
+  }
+  case GPIO_PIN_9:
+  {
+  if(now - last_time_9 < DEBOUNCE_MS) break;
+  last_time_9 = now;
+
+    xEventGroupSetBitsFromISR(vcuEventGroup, BTN_RTD, &xHigherPriorityTaskWoken);
+  break;
+  }
+
+  case GPIO_PIN_10:
+  {
+  if(now - last_time_10 < DEBOUNCE_MS) break;
+  last_time_10 = now;
+
+  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_WATER_PUMP, &xHigherPriorityTaskWoken);
+  break;
+  }
+
+  default:
+      break;
 }
 
-if (GPIO_PIN == BTN_POWER_MODE) {
-  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_POWER_MODE, #xHigerPriorityTaskWoken);
-
+portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
-
-if(GPIO_PIN == BTN_RTD) {
-  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_RTD, #xHigerPriorityTaskWoken);
-}
-
-if(GPIO_PIN == BTN_WATER_PUMP){
-  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_WATER_PUMP, #xHigerPriorityTaskWoken);
-}
-protYIELD_FROM_ISR(xHigherPriorityTaskWoekn);
-}
-
 /* USER CODE END 2 */

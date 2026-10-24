@@ -29,7 +29,8 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "FreeRTOS.h"
+#include "event_groups.h"
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN Private defines */

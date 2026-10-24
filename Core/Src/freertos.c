@@ -31,6 +31,7 @@
 #include "fdcan.h"
 #include "adc.h"
 #include "tim.h"
+#include "gpio.h"
 
 extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
 extern void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
@@ -586,7 +587,7 @@ void StartPWMTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartTaskGPIO */
-void StartTaskGPIO(void *argument)
+EventGroupHandle_t vcuEventGroupvoid StartTaskGPIO(void *argument)
 {
   /* USER CODE BEGIN StartTaskGPIO */
   /* Infinite loop */
@@ -595,7 +596,7 @@ void StartTaskGPIO(void *argument)
   {
     uxBits = xEventGroupWaitBits(
       vcuEventGroup,
-      BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECk,
+      (BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECK),
       pdTRUE,
       pdFALSE,
       portMAX_DELAY
@@ -603,61 +604,38 @@ void StartTaskGPIO(void *argument)
 
     if((uxBits & BTN_POWER_MODE) != 0){
       //Should Check that power is being delieverd
+      return;
     }
 
     if ((uxBits & BTN_HV_CHECK) != 0){
 
       //Check if were above 60V
 
+        return;
+      }
     }
 
     if ((uxBits & BTN_RTD) !=0) {
 
       //All tests should pass, if any failure we should then iniatiate a shutdow
-
+      return;
     }
 
     if ((uxBits & BTN_WATER_PUMP) != 0){
       //Pass water through the system
+
+        return;
     }
+    osDelay(1);
+
   }
 
-    osDelay(1);
+
 
   /* USER CODE END StartTaskGPIO */
 
-}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-/* if (now-btn_last[btn_idx] < DEBOUNCE_MS) break;
-
-      if(HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
-        button_state |= BTN_POWER_MODE;
-        break;
-      }
-
-      else if (HAL_GPIO_ReadPin(GPIOC,GPIO_PIN_6) == GPIO_PIN_SET){
-        button_state |= BTN_HV_CHECK;
-      break;
-    }
-  }
-    case GPIO_PIN_9 :
-    {
-      if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
-      button_state |= BTN_RTD;
-      break;
-    }
-
-    case GPIO_PIN_10:
-    {
-      if (now - btn_last[btn_idx] < DEBOUNCE_MS) break;
-      button_state |= BTN_WATER_PUMP;
-      break;
-    }
-
-    default: break;
-  }
-  btn_last[btn_idx] = now;
-*/
