@@ -587,7 +587,8 @@ void StartPWMTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartTaskGPIO */
-EventGroupHandle_t vcuEventGroupvoid StartTaskGPIO(void *argument)
+EventGroupHandle_t vcuEventGroup;
+void StartTaskGPIO(void *argument)
 {
   /* USER CODE BEGIN StartTaskGPIO */
   /* Infinite loop */
