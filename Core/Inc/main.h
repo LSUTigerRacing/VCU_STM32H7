@@ -36,6 +36,7 @@ extern "C" {
 #include "cmsis_os2.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include <stdio.h>
 #endif
 uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size);
 /* USER CODE END Includes */
@@ -85,10 +86,6 @@ void Error_Handler(void);
 #define THROTTLE_PEDAL_POSITION_GPIO_Port GPIOB
 #define SUSPENSION_BL_Pin GPIO_PIN_1
 #define SUSPENSION_BL_GPIO_Port GPIOB
-#define SD_CD_Pin GPIO_PIN_10
-#define SD_CD_GPIO_Port GPIOD
-#define SD_WP_Pin GPIO_PIN_11
-#define SD_WP_GPIO_Port GPIOD
 #define SD_Detect_Pin GPIO_PIN_14
 #define SD_Detect_GPIO_Port GPIOD
 #define DigOut_5_Pin GPIO_PIN_15
