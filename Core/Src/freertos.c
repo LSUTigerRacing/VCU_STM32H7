@@ -169,7 +169,7 @@ const osThreadAttr_t PowerOn_attributes = {
 };
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
-uint8_t CAN1rxQBuffer[ 1024 * sizeof( uint8_t ) ];
+uint8_t CAN1rxQBuffer[ 16 * sizeof( CAN_Msg_Raw ) ];
 osStaticMessageQDef_t CAN1rxQControlBlock;
 const osMessageQueueAttr_t CAN1rxQ_attributes = {
   .name = "CAN1rxQ",
@@ -180,7 +180,7 @@ const osMessageQueueAttr_t CAN1rxQ_attributes = {
 };
 /* Definitions for CAN1txQ */
 osMessageQueueId_t CAN1txQHandle;
-uint8_t CAN1txQBuffer[ 128 * sizeof( uint8_t ) ];
+uint8_t CAN1txQBuffer[ 8 * sizeof( CAN_Msg_Raw ) ];
 osStaticMessageQDef_t CAN1txQControlBlock;
 const osMessageQueueAttr_t CAN1txQ_attributes = {
   .name = "CAN1txQ",
@@ -191,7 +191,7 @@ const osMessageQueueAttr_t CAN1txQ_attributes = {
 };
 /* Definitions for CAN2rxQ */
 osMessageQueueId_t CAN2rxQHandle;
-uint8_t CAN2rxQBuffer[ 1024 * sizeof( uint8_t ) ];
+uint8_t CAN2rxQBuffer[ 24 * sizeof( CAN_Msg_Raw ) ];
 osStaticMessageQDef_t CAN2rxQControlBlock;
 const osMessageQueueAttr_t CAN2rxQ_attributes = {
   .name = "CAN2rxQ",
@@ -202,7 +202,7 @@ const osMessageQueueAttr_t CAN2rxQ_attributes = {
 };
 /* Definitions for CAN2txQ */
 osMessageQueueId_t CAN2txQHandle;
-uint8_t CAN2txQBuffer[ 128 * sizeof( uint8_t ) ];
+uint8_t CAN2txQBuffer[ 16 * sizeof( CAN_Msg_Raw ) ];
 osStaticMessageQDef_t CAN2txQControlBlock;
 const osMessageQueueAttr_t CAN2txQ_attributes = {
   .name = "CAN2txQ",
@@ -358,16 +358,16 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of CAN1rxQ */
-  CAN1rxQHandle = osMessageQueueNew (1024, sizeof(uint8_t), &CAN1rxQ_attributes);
+  CAN1rxQHandle = osMessageQueueNew (16, sizeof(CAN_Msg_Raw), &CAN1rxQ_attributes);
 
   /* creation of CAN1txQ */
-  CAN1txQHandle = osMessageQueueNew (128, sizeof(uint8_t), &CAN1txQ_attributes);
+  CAN1txQHandle = osMessageQueueNew (8, sizeof(CAN_Msg_Raw), &CAN1txQ_attributes);
 
   /* creation of CAN2rxQ */
-  CAN2rxQHandle = osMessageQueueNew (1024, sizeof(uint8_t), &CAN2rxQ_attributes);
+  CAN2rxQHandle = osMessageQueueNew (24, sizeof(CAN_Msg_Raw), &CAN2rxQ_attributes);
 
   /* creation of CAN2txQ */
-  CAN2txQHandle = osMessageQueueNew (128, sizeof(uint8_t), &CAN2txQ_attributes);
+  CAN2txQHandle = osMessageQueueNew (16, sizeof(CAN_Msg_Raw), &CAN2txQ_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
