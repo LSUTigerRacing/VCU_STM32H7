@@ -23,7 +23,6 @@
 #include "main.h"
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
-#include "event_groups.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -44,6 +43,7 @@ typedef StaticTask_t osStaticThreadDef_t;
 typedef StaticQueue_t osStaticMessageQDef_t;
 typedef StaticSemaphore_t osStaticMutexDef_t;
 typedef StaticSemaphore_t osStaticSemaphoreDef_t;
+typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE BEGIN PTD */
 
 /* USER CODE END PTD */
@@ -268,6 +268,14 @@ const osSemaphoreAttr_t CAN2txS_attributes = {
   .cb_mem = &CAN2txSControlBlock,
   .cb_size = sizeof(CAN2txSControlBlock),
 };
+/* Definitions for VCUGroupEvent */
+osEventFlagsId_t VCUGroupEventHandle;
+osStaticEventGroupDef_t VCUGroupEventControlBlock;
+const osEventFlagsAttr_t VCUGroupEvent_attributes = {
+  .name = "VCUGroupEvent",
+  .cb_mem = &VCUGroupEventControlBlock,
+  .cb_size = sizeof(VCUGroupEventControlBlock),
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -379,6 +387,9 @@ void MX_FREERTOS_Init(void) {
   /* add threads, ... */
 
   /* USER CODE END RTOS_THREADS */
+
+  /* creation of VCUGroupEvent */
+  VCUGroupEventHandle = osEventFlagsNew(&VCUGroupEvent_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -587,7 +598,6 @@ void StartPWMTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartTaskGPIO */
-EventGroupHandle_t vcuEventGroup;
 void StartTaskGPIO(void *argument)
 {
   /* USER CODE BEGIN StartTaskGPIO */
@@ -596,7 +606,7 @@ void StartTaskGPIO(void *argument)
   for (;;)
   {
     uxBits = xEventGroupWaitBits(
-      vcuEventGroup,
+      VCUGroupEventHandle,
       (BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECK),
       pdTRUE,
       pdFALSE,
@@ -630,9 +640,6 @@ void StartTaskGPIO(void *argument)
     osDelay(1);
 
   }
-
-
-
   /* USER CODE END StartTaskGPIO */
 
 
