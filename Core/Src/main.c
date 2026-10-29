@@ -28,6 +28,7 @@
 #include "mdma.h"
 #include "octospi.h"
 #include "ramecc.h"
+#include "rtc.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -35,6 +36,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define CMSIS
+#include "SEGGER_RTT.h"
+#include "SEGGER_SYSVIEW.h"
+#include "sdmmc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -135,7 +139,11 @@ int main(void)
   MX_TIM14_Init();
   MX_FATFS_Init();
   MX_OCTOSPI1_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  SEGGER_RTT_Init();
+  SEGGER_SYSVIEW_Conf();
+  MX_SDMMC1_SD_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -182,9 +190,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
   RCC_OscInitStruct.HSICalibrationValue = 64;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 4;
