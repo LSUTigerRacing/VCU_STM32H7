@@ -30,6 +30,7 @@
 #include "fdcan.h"
 #include "adc.h"
 #include "tim.h"
+#include "gpio.h"
 #include "fatfs.h"
 #include "ff.h"
 #include "rtc.h"
@@ -45,6 +46,7 @@ typedef StaticTask_t osStaticThreadDef_t;
 typedef StaticQueue_t osStaticMessageQDef_t;
 typedef StaticSemaphore_t osStaticMutexDef_t;
 typedef StaticSemaphore_t osStaticSemaphoreDef_t;
+typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE BEGIN PTD */
 
 typedef struct {
@@ -173,6 +175,17 @@ const osThreadAttr_t PWMTask_attributes = {
   .stack_size = sizeof(PWMTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal4,
 };
+/* Definitions for GPIOTask */
+osThreadId_t GPIOTaskHandle;
+uint32_t GPIOTaskBuffer[ 128 ];
+osStaticThreadDef_t GPIOTaskControlBlock;
+const osThreadAttr_t GPIOTask_attributes = {
+  .name = "GPIOTask",
+  .cb_mem = &GPIOTaskControlBlock,
+  .cb_size = sizeof(GPIOTaskControlBlock),
+  .stack_mem = &GPIOTaskBuffer[0],
+  .stack_size = sizeof(GPIOTaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal3,
 /* Definitions for LoggingTask */
 osThreadId_t LoggingTaskHandle;
 uint32_t LoggingTaskBuffer[ 1024 ];
@@ -304,6 +317,14 @@ const osSemaphoreAttr_t CAN2txS_attributes = {
   .cb_mem = &CAN2txSControlBlock,
   .cb_size = sizeof(CAN2txSControlBlock),
 };
+/* Definitions for VCUGroupEvent */
+osEventFlagsId_t VCUGroupEventHandle;
+osStaticEventGroupDef_t VCUGroupEventControlBlock;
+const osEventFlagsAttr_t VCUGroupEvent_attributes = {
+  .name = "VCUGroupEvent",
+  .cb_mem = &VCUGroupEventControlBlock,
+  .cb_size = sizeof(VCUGroupEventControlBlock),
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -317,6 +338,7 @@ void StartDecodeCAN1(void *argument);
 void StartCreateMsgCAN1(void *argument);
 void StartCreateMsgCAN2(void *argument);
 void StartPWMTask(void *argument);
+void StartTaskGPIO(void *argument);
 void StartLoggingTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -328,7 +350,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+  //Creation of Event group
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of CAN1txM */
@@ -345,6 +367,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -410,12 +433,18 @@ void MX_FREERTOS_Init(void) {
   /* creation of PWMTask */
   PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
 
+  /* creation of GPIOTask */
+  GPIOTaskHandle = osThreadNew(StartTaskGPIO, NULL, &GPIOTask_attributes);
   /* creation of LoggingTask */
   LoggingTaskHandle = osThreadNew(StartLoggingTask, NULL, &LoggingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+
   /* USER CODE END RTOS_THREADS */
+
+  /* creation of VCUGroupEvent */
+  VCUGroupEventHandle = osEventFlagsNew(&VCUGroupEvent_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -436,7 +465,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+  osDelay(1);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -562,7 +591,7 @@ void StartDecodeCAN1(void *argument)
 
       default:
       Error_Handler();
-    } 
+    }
     osDelay(1);
   }
   /* USER CODE END StartDecodeCAN1 */
@@ -637,6 +666,57 @@ void StartPWMTask(void *argument)
   }
   /* USER CODE END StartPWMTask */
 }
+
+/* USER CODE BEGIN Header_StartTaskGPIO */
+/**
+* @brief Function implementing the GPIOTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskGPIO */
+void StartTaskGPIO(void *argument)
+{
+  /* USER CODE BEGIN StartTaskGPIO */
+  /* Infinite loop */
+  EventBits_t uxBits;
+  for (;;)
+  {
+    uxBits = xEventGroupWaitBits(
+      VCUGroupEventHandle,
+      (BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECK),
+      pdTRUE,
+      pdFALSE,
+      portMAX_DELAY
+    );
+
+    if((uxBits & BTN_POWER_MODE) != 0){
+      //Should Check that power is being delieverd
+      return;
+    }
+
+    if ((uxBits & BTN_HV_CHECK) != 0){
+
+      //Check if were above 60V
+
+        return;
+      }
+    }
+
+    if ((uxBits & BTN_RTD) !=0) {
+
+      //All tests should pass, if any failure we should then iniatiate a shutdow
+      return;
+    }
+
+    if ((uxBits & BTN_WATER_PUMP) != 0){
+      //Pass water through the system
+
+        return;
+    }
+    osDelay(1);
+
+  }
+  /* USER CODE END StartTaskGPIO */
 
 /* USER CODE BEGIN Header_StartLoggingTask */
 /**
@@ -714,4 +794,3 @@ void StartLoggingTask(void *argument)
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-
