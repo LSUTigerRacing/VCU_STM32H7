@@ -103,8 +103,8 @@ void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 2 */
 //volatile uint32_t button_state = 0;
-extern EventGroupHandle_t vcuEventGroup;
 
+extern EventGroupHandle_t VCUGroupEventHandle;
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
 {
 //Can adjust later, this is to limit timestamp conflict
@@ -121,10 +121,10 @@ switch(GPIO_PIN){
     last_time_6 = now;
   if (HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
   //This replaces the button_state
-  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_POWER_MODE,&xHigherPriorityTaskWoken);
+  xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_POWER_MODE,&xHigherPriorityTaskWoken);
   }
   else if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6) == GPIO_PIN_SET){
-xEventGroupSetBitsFromISR(vcuEventGroup, BTN_HV_CHECK,&xHigherPriorityTaskWoken);
+xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_HV_CHECK,&xHigherPriorityTaskWoken);
 }
   break;
   }
@@ -133,7 +133,7 @@ xEventGroupSetBitsFromISR(vcuEventGroup, BTN_HV_CHECK,&xHigherPriorityTaskWoken)
   if(now - last_time_9 < DEBOUNCE_MS) break;
   last_time_9 = now;
 
-    xEventGroupSetBitsFromISR(vcuEventGroup, BTN_RTD, &xHigherPriorityTaskWoken);
+    xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_RTD, &xHigherPriorityTaskWoken);
   break;
   }
 
@@ -142,7 +142,7 @@ xEventGroupSetBitsFromISR(vcuEventGroup, BTN_HV_CHECK,&xHigherPriorityTaskWoken)
   if(now - last_time_10 < DEBOUNCE_MS) break;
   last_time_10 = now;
 
-  xEventGroupSetBitsFromISR(vcuEventGroup, BTN_WATER_PUMP, &xHigherPriorityTaskWoken);
+  xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_WATER_PUMP, &xHigherPriorityTaskWoken);
   break;
   }
 
