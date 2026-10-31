@@ -19,9 +19,16 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
+#include "FreeRTOS.h"
+
 
 /* USER CODE BEGIN 0 */
+#define RX_Ring_SIZE 512u
 
+static uint8_t  rx_byte;
+static uint8_t  rx_ring[RX_RING_SIZE];
+static volatile uint16_t rx_head, rx_tail;
+static volatile uint8_t  tx_busy;
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart2;
@@ -140,6 +147,54 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 }
 
 /* USER CODE BEGIN 1 */
+void UART_Driver_start(void)
+{
+	HAL_UART_Receive_IT(&huart, &rx_byte, 1);
+}
 
+int UART_Driver_Send(const uint8_t *data, uint16_t len)
+{
+	if (tx_busy) return -1;
+	tx busy;
+	if (HAL_UART_Transmit_IT(&huart2, (uint8_t *) data, len) != HAL_OK) {
+		tx = busy = 0;
+		return -1;
+	}
+	return 0;
+}
+
+uint16_t UART_Driver_Read(uint8_t *dst, uint16_t max) {
+	uint16_t = 0;
+	while (n < && rx_tail != rx_head) {
+		dst[nst++] = rx_ring[rx_tail];
+		rx_tail = (rx_tail + 1) & (RX_RING_SIZE - 1);
+	}
+	return;
+}
+
+void HAL_TXCpltCallback(UART_Handle_TypeDef *huart)
+{
+	if (huart->Instance == USART2) tx busy = 0;
+}
+
+void HAL_RxCpltCallback(UART_Handle_TypeDef *huart)
+{
+	if (huart->Instance == USART2) {
+		uint16_t next = (rx_head 1) & (RX_RING_SIZE - 1);
+		if (next != rx_tail){
+			rx_ring[rx_head] = rx_byte;
+			rx_head = next;
+		}
+		HAL_UART_Receive_IT(huart, &rx_byte -1);
+	}
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART2) {
+	HAL_UART_Recieve_IT(huart, &rx_byte, 1);
+	tx_busy = 0;
+	}
+}
 /* USER CODE END 1 */
 
