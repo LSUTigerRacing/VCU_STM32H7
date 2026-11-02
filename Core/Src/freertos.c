@@ -160,12 +160,17 @@ const osThreadAttr_t RTDSM_attributes = {
   .stack_size = sizeof(StateMachineBuffer),
   .priority = (osPriority_t) osPriorityRealtime,
 };
-/* Definitions for PowerOn */
-osThreadId_t PowerOnHandle;
-const osThreadAttr_t PowerOn_attributes = {
-  .name = "PowerOn",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityRealtime7,
+/* Definitions for RTDOn */
+osThreadId_t RTDOnHandle;
+uint32_t RTDOnBuffer[ 128 ];
+osStaticThreadDef_t RTDOnControlBlock;
+const osThreadAttr_t RTDOn_attributes = {
+  .name = "RTDOn",
+  .cb_mem = &RTDOnControlBlock,
+  .cb_size = sizeof(RTDOnControlBlock),
+  .stack_mem = &RTDOnBuffer[0],
+  .stack_size = sizeof(RTDOnBuffer),
+  .priority = (osPriority_t) osPriorityRealtime4,
 };
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
@@ -283,14 +288,6 @@ const osEventFlagsAttr_t RTD_attributes = {
   .cb_mem = &RTDControlBlock,
   .cb_size = sizeof(RTDControlBlock),
 };
-/* Definitions for BSPD */
-osEventFlagsId_t BSPDHandle;
-osStaticEventGroupDef_t BSPDControlBlock;
-const osEventFlagsAttr_t BSPD_attributes = {
-  .name = "BSPD",
-  .cb_mem = &BSPDControlBlock,
-  .cb_size = sizeof(BSPDControlBlock),
-};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -305,7 +302,7 @@ void StartCreateMsgCAN1(void *argument);
 void StartCreateMsgCAN2(void *argument);
 void StartPWMTask(void *argument);
 void StartRTDSM(void *argument);
-void StartPowerOn(void *argument);
+void StartRTDOn(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -398,8 +395,8 @@ void MX_FREERTOS_Init(void) {
   /* creation of RTDSM */
   RTDSMHandle = osThreadNew(StartRTDSM, NULL, &RTDSM_attributes);
 
-  /* creation of PowerOn */
-  PowerOnHandle = osThreadNew(StartPowerOn, NULL, &PowerOn_attributes);
+  /* creation of RTDOn */
+  RTDOnHandle = osThreadNew(StartRTDOn, NULL, &RTDOn_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -407,9 +404,6 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of RTD */
   RTDHandle = osEventFlagsNew(&RTD_attributes);
-
-  /* creation of BSPD */
-  BSPDHandle = osEventFlagsNew(&BSPD_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -451,6 +445,7 @@ void StartADCTask(void *argument)
 
   HAL_TIM_Base_Start(&htim1);
 
+  uint8_t can_data[8] = {0};
   /* Infinite loop */
   for(;;)
   {
@@ -470,6 +465,18 @@ void StartADCTask(void *argument)
 
     f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
     b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
+
+    //implement throttle curve
+    
+    Prepare_Message(&hfdcan1, 0x16, can_data, 8); //add actual can id for throttle input
+
+    //put actual brake light pin
+    if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
+      HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_SET);
+    }
+    else{
+      HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_RESET);
+    }
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
   }
@@ -623,11 +630,11 @@ void StartRTDSM(void *argument)
 {
   /* USER CODE BEGIN StartRTDSM */
   uint32_t flags;
-  uint8_t can_data[8];
+  uint8_t can_data[8] = {0};
   /* Infinite loop */
   for(;;)
   {
-    osEventFlagsWait(RTDHandle,RTD_ON || RTD_BUZZ, osFlagsNoClear, osWaitForever);
+    osEventFlagsWait(RTDHandle,RTD_ON | RTD_BUZZ, osFlagsWaitAny, osWaitForever);
     flags = osEventFlagsGet(RTDHandle);
     if(!(flags & RTD_ON)){
       //CAN message to turn on motor controller
@@ -636,8 +643,9 @@ void StartRTDSM(void *argument)
     }
     else if(flags & RTD_BUZZ){
       // turn buzzer on for 1 second
-
+      HAL_GPIO_WritePin(GPIOA,10, GPIO_PIN_SET); //put actual buzzer pin when done implementing
       osDelay(1000);
+      HAL_GPIO_WritePin(GPIOA,10,GPIO_PIN_RESET);
       osEventFlagsClear(RTDHandle, RTD_BUZZ);
 
       can_data[3] = 0;
@@ -649,22 +657,26 @@ void StartRTDSM(void *argument)
   /* USER CODE END StartRTDSM */
 }
 
-/* USER CODE BEGIN Header_StartPowerOn */
+/* USER CODE BEGIN Header_StartRTDOn */
 /**
-* @brief Function implementing the PowerOn thread.
+* @brief Function implementing the RTDOn thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartPowerOn */
-void StartPowerOn(void *argument)
+/* USER CODE END Header_StartRTDOn */
+void StartRTDOn(void *argument)
 {
-  /* USER CODE BEGIN StartPowerOn */
+  /* USER CODE BEGIN StartRTDOn */
+  //call from GPIO input from RTD button
   /* Infinite loop */
   for(;;)
   {
+    if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
+      osEventFlagsSet(RTDHandle, RTD_BUZZ);
+    }
     osDelay(1);
   }
-  /* USER CODE END StartPowerOn */
+  /* USER CODE END StartRTDOn */
 }
 
 /* Private application code --------------------------------------------------*/

@@ -83,6 +83,8 @@ typedef struct{
 
 extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
 extern void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
+extern CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
+extern CAN_Decoded_Values* Get_Message(uint16_t id);
 
 DBC_Translation Assign_Signal(CAN_Msg_Raw *msg);
 /* USER CODE END Prototypes */

@@ -90,7 +90,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 
   }
 
-  if( (throttle_pos.data1 + throttle_pos.data2)>= ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
+  //BSPD check
+  if( (throttle_pos.data1 + throttle_pos.data2)>= HARD_ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
     osEventFlagsClear(RTDHandle, RTD_ON);
   }
 
