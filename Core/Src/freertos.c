@@ -34,9 +34,6 @@
 #include "ff.h"
 #include "rtc.h"
 
-extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
-extern void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
-
 extern DBC_Translation Assign_Signal(CAN_Msg_Raw *msg);
 /* USER CODE END Includes */
 
@@ -175,29 +172,17 @@ const osThreadAttr_t PWMTask_attributes = {
   .stack_size = sizeof(PWMTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal4,
 };
-/* Definitions for RTDSM */
-osThreadId_t RTDSMHandle;
-uint32_t StateMachineBuffer[ 2048 ];
-osStaticThreadDef_t StateMachineControlBlock;
-const osThreadAttr_t RTDSM_attributes = {
-  .name = "RTDSM",
-  .cb_mem = &StateMachineControlBlock,
-  .cb_size = sizeof(StateMachineControlBlock),
-  .stack_mem = &StateMachineBuffer[0],
-  .stack_size = sizeof(StateMachineBuffer),
-  .priority = (osPriority_t) osPriorityRealtime,
-};
-/* Definitions for RTDOn */
-osThreadId_t RTDOnHandle;
-uint32_t RTDOnBuffer[ 128 ];
-osStaticThreadDef_t RTDOnControlBlock;
-const osThreadAttr_t RTDOn_attributes = {
-  .name = "RTDOn",
-  .cb_mem = &RTDOnControlBlock,
-  .cb_size = sizeof(RTDOnControlBlock),
-  .stack_mem = &RTDOnBuffer[0],
-  .stack_size = sizeof(RTDOnBuffer),
-  .priority = (osPriority_t) osPriorityRealtime4,
+/* Definitions for LoggingTask */
+osThreadId_t LoggingTaskHandle;
+uint32_t LoggingTaskBuffer[ 1024 ];
+osStaticThreadDef_t LoggingTaskControlBlock;
+const osThreadAttr_t LoggingTask_attributes = {
+  .name = "LoggingTask",
+  .cb_mem = &LoggingTaskControlBlock,
+  .cb_size = sizeof(LoggingTaskControlBlock),
+  .stack_mem = &LoggingTaskBuffer[0],
+  .stack_size = sizeof(LoggingTaskBuffer),
+  .priority = (osPriority_t) osPriorityLow1,
 };
 /* Definitions for GPIOTask */
 osThreadId_t GPIOTaskHandle;
@@ -211,17 +196,29 @@ const osThreadAttr_t GPIOTask_attributes = {
   .stack_size = sizeof(GPIOTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal3,
 };
-/* Definitions for LoggingTask */
-osThreadId_t LoggingTaskHandle;
-uint32_t LoggingTaskBuffer[ 1024 ];
-osStaticThreadDef_t LoggingTaskControlBlock;
-const osThreadAttr_t LoggingTask_attributes = {
-  .name = "LoggingTask",
-  .cb_mem = &LoggingTaskControlBlock,
-  .cb_size = sizeof(LoggingTaskControlBlock),
-  .stack_mem = &LoggingTaskBuffer[0],
-  .stack_size = sizeof(LoggingTaskBuffer),
-  .priority = (osPriority_t) osPriorityLow1,
+/* Definitions for RTDSM */
+osThreadId_t RTDSMHandle;
+uint32_t RTDSMBuffer[ 128 ];
+osStaticThreadDef_t RTDSMControlBlock;
+const osThreadAttr_t RTDSM_attributes = {
+  .name = "RTDSM",
+  .cb_mem = &RTDSMControlBlock,
+  .cb_size = sizeof(RTDSMControlBlock),
+  .stack_mem = &RTDSMBuffer[0],
+  .stack_size = sizeof(RTDSMBuffer),
+  .priority = (osPriority_t) osPriorityRealtime7,
+};
+/* Definitions for RTDOn */
+osThreadId_t RTDOnHandle;
+uint32_t RTDOnBuffer[ 128 ];
+osStaticThreadDef_t RTDOnControlBlock;
+const osThreadAttr_t RTDOn_attributes = {
+  .name = "RTDOn",
+  .cb_mem = &RTDOnControlBlock,
+  .cb_size = sizeof(RTDOnControlBlock),
+  .stack_mem = &RTDOnBuffer[0],
+  .stack_size = sizeof(RTDOnBuffer),
+  .priority = (osPriority_t) osPriorityRealtime5,
 };
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
@@ -342,14 +339,6 @@ const osSemaphoreAttr_t CAN2txS_attributes = {
   .cb_mem = &CAN2txSControlBlock,
   .cb_size = sizeof(CAN2txSControlBlock),
 };
-/* Definitions for RTD */
-osEventFlagsId_t RTDHandle;
-osStaticEventGroupDef_t RTDControlBlock;
-const osEventFlagsAttr_t RTD_attributes = {
-  .name = "RTD",
-  .cb_mem = &RTDControlBlock,
-  .cb_size = sizeof(RTDControlBlock),
-};
 /* Definitions for VCUGroupEvent */
 osEventFlagsId_t VCUGroupEventHandle;
 osStaticEventGroupDef_t VCUGroupEventControlBlock;
@@ -357,6 +346,14 @@ const osEventFlagsAttr_t VCUGroupEvent_attributes = {
   .name = "VCUGroupEvent",
   .cb_mem = &VCUGroupEventControlBlock,
   .cb_size = sizeof(VCUGroupEventControlBlock),
+};
+/* Definitions for RTD */
+osEventFlagsId_t RTDHandle;
+osStaticEventGroupDef_t RTDControlBlock;
+const osEventFlagsAttr_t RTD_attributes = {
+  .name = "RTD",
+  .cb_mem = &RTDControlBlock,
+  .cb_size = sizeof(RTDControlBlock),
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -371,10 +368,10 @@ void StartDecodeCAN1(void *argument);
 void StartCreateMsgCAN1(void *argument);
 void StartCreateMsgCAN2(void *argument);
 void StartPWMTask(void *argument);
+void StartLoggingTask(void *argument);
+void StartTaskGPIO(void *argument);
 void StartRTDSM(void *argument);
 void StartRTDOn(void *argument);
-void StartTaskGPIO(void *argument);
-void StartLoggingTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -468,25 +465,28 @@ void MX_FREERTOS_Init(void) {
   /* creation of PWMTask */
   PWMTaskHandle = osThreadNew(StartPWMTask, NULL, &PWMTask_attributes);
 
+  /* creation of LoggingTask */
+  LoggingTaskHandle = osThreadNew(StartLoggingTask, NULL, &LoggingTask_attributes);
+
+  /* creation of GPIOTask */
+  GPIOTaskHandle = osThreadNew(StartTaskGPIO, NULL, &GPIOTask_attributes);
+
   /* creation of RTDSM */
   RTDSMHandle = osThreadNew(StartRTDSM, NULL, &RTDSM_attributes);
 
   /* creation of RTDOn */
   RTDOnHandle = osThreadNew(StartRTDOn, NULL, &RTDOn_attributes);
-  /* creation of GPIOTask */
-  GPIOTaskHandle = osThreadNew(StartTaskGPIO, NULL, &GPIOTask_attributes);
-  /* creation of LoggingTask */
-  LoggingTaskHandle = osThreadNew(StartLoggingTask, NULL, &LoggingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
 
   /* USER CODE END RTOS_THREADS */
 
-  /* creation of RTD */
-  RTDHandle = osEventFlagsNew(&RTD_attributes);
   /* creation of VCUGroupEvent */
   VCUGroupEventHandle = osEventFlagsNew(&VCUGroupEvent_attributes);
+
+  /* creation of RTD */
+  RTDHandle = osEventFlagsNew(&RTD_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -723,116 +723,6 @@ void StartPWMTask(void *argument)
   /* USER CODE END StartPWMTask */
 }
 
-/* USER CODE BEGIN Header_StartRTDSM */
-/**
-* @brief Function implementing the RTDSM thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartRTDSM */
-void StartRTDSM(void *argument)
-{
-  /* USER CODE BEGIN StartRTDSM */
-  uint32_t flags;
-  uint8_t can_data[8] = {0};
-  /* Infinite loop */
-  for(;;)
-  {
-    osEventFlagsWait(RTDHandle,RTD_ON | RTD_BUZZ, osFlagsWaitAny, osWaitForever);
-    flags = osEventFlagsGet(RTDHandle);
-    if(!(flags & RTD_ON)){
-      //CAN message to turn on motor controller
-      can_data[3] = 1;
-      Prepare_Message(&hfdcan1,0x24,can_data,8); 
-    }
-    else if(flags & RTD_BUZZ){
-      // turn buzzer on for 1 second
-      HAL_GPIO_WritePin(GPIOA,10, GPIO_PIN_SET); //put actual buzzer pin when done implementing
-      osDelay(1000);
-      HAL_GPIO_WritePin(GPIOA,10,GPIO_PIN_RESET);
-      osEventFlagsClear(RTDHandle, RTD_BUZZ);
-
-      can_data[3] = 0;
-      // turn on motor controller
-      Prepare_Message(&hfdcan1, 0x24, can_data, 8);
-      osEventFlagsSet(RTDHandle, RTD_ON);
-    }
-  }
-  /* USER CODE END StartRTDSM */
-}
-
-/* USER CODE BEGIN Header_StartRTDOn */
-/**
-* @brief Function implementing the RTDOn thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartRTDOn */
-void StartRTDOn(void *argument)
-{
-  /* USER CODE BEGIN StartRTDOn */
-  //call from GPIO input from RTD button
-  /* Infinite loop */
-  for(;;)
-  {
-    if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
-      osEventFlagsSet(RTDHandle, RTD_BUZZ);
-    }
-    osDelay(1);
-  }
-  /* USER CODE END StartRTDOn */
-}
-/* USER CODE BEGIN Header_StartTaskGPIO */
-/**
-* @brief Function implementing the GPIOTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskGPIO */
-void StartTaskGPIO(void *argument)
-{
-  /* USER CODE BEGIN StartTaskGPIO */
-  /* Infinite loop */
-  EventBits_t uxBits;
-  for (;;)
-  {
-    uxBits = xEventGroupWaitBits(
-      VCUGroupEventHandle,
-      (BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECK),
-      pdTRUE,
-      pdFALSE,
-      portMAX_DELAY
-    );
-
-    if((uxBits & BTN_POWER_MODE) != 0){
-      //Should Check that power is being delieverd
-      return;
-    }
-
-    if ((uxBits & BTN_HV_CHECK) != 0){
-
-      //Check if were above 60V
-
-        return;
-      }
-    }
-
-    if ((uxBits & BTN_RTD) !=0) {
-
-      //All tests should pass, if any failure we should then iniatiate a shutdow
-      return;
-    }
-
-    if ((uxBits & BTN_WATER_PUMP) != 0){
-      //Pass water through the system
-
-        return;
-    }
-    osDelay(1);
-
-  }
-  /* USER CODE END StartTaskGPIO */
-
 /* USER CODE BEGIN Header_StartLoggingTask */
 /**
 * @brief Function implementing the LoggingTask thread.
@@ -905,7 +795,120 @@ void StartLoggingTask(void *argument)
   /* USER CODE END StartLoggingTask */
 }
 
+/* USER CODE BEGIN Header_StartTaskGPIO */
+/**
+* @brief Function implementing the GPIOTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskGPIO */
+void StartTaskGPIO(void *argument)
+{
+  /* USER CODE BEGIN StartTaskGPIO */
+  /* Infinite loop */
+  EventBits_t uxBits;
+  for (;;)
+  {
+    uxBits = xEventGroupWaitBits(
+      VCUGroupEventHandle,
+      (BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECK),
+      pdTRUE,
+      pdFALSE,
+      portMAX_DELAY
+    );
+
+    if((uxBits & BTN_POWER_MODE) != 0){
+      //Should Check that power is being delieverd
+      return;
+    }
+
+    if ((uxBits & BTN_HV_CHECK) != 0){
+
+      //Check if were above 60V
+
+        return;
+    }
+
+    if ((uxBits & BTN_RTD) !=0) {
+
+      //All tests should pass, if any failure we should then iniatiate a shutdow
+      return;
+    }
+
+    if ((uxBits & BTN_WATER_PUMP) != 0){
+      //Pass water through the system
+
+        return;
+    }
+    osDelay(1);
+
+  }
+  /* USER CODE END StartTaskGPIO */
+}
+
+/* USER CODE BEGIN Header_StartRTDSM */
+/**
+* @brief Function implementing the RTDSM thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRTDSM */
+void StartRTDSM(void *argument)
+{
+  /* USER CODE BEGIN StartRTDSM */
+  uint32_t flags;
+  uint8_t can_data[8] = {0};
+  /* Infinite loop */
+  for(;;)
+  {
+    osEventFlagsWait(RTDHandle,RTD_ON | RTD_BUZZ, osFlagsWaitAny, osWaitForever);
+    flags = osEventFlagsGet(RTDHandle);
+    if(!(flags & RTD_ON)){
+      //CAN message to turn on motor controller
+      can_data[3] = 1;
+      Prepare_Message(&hfdcan1,0x24,can_data,8); 
+    }
+    else if(flags & RTD_BUZZ){
+      // turn buzzer on for 1 second
+      HAL_GPIO_WritePin(GPIOA,10, GPIO_PIN_SET); //put actual buzzer pin when done implementing
+      osDelay(1000);
+      HAL_GPIO_WritePin(GPIOA,10,GPIO_PIN_RESET);
+      osEventFlagsClear(RTDHandle, RTD_BUZZ);
+
+      can_data[3] = 0;
+      // turn on motor controller
+      Prepare_Message(&hfdcan1, 0x24, can_data, 8);
+      osEventFlagsSet(RTDHandle, RTD_ON);
+    }
+    osDelay(1);
+  }
+  /* USER CODE END StartRTDSM */
+}
+
+/* USER CODE BEGIN Header_StartRTDOn */
+/**
+* @brief Function implementing the RTDOn thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartRTDOn */
+void StartRTDOn(void *argument)
+{
+  /* USER CODE BEGIN StartRTDOn */
+  //call from GPIO input from RTD button
+  /* Infinite loop */
+  for(;;)
+  {
+    if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
+      osEventFlagsSet(RTDHandle, RTD_BUZZ);
+    }
+    osDelay(1);
+  }
+  /* USER CODE END StartRTDOn */
+}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
+

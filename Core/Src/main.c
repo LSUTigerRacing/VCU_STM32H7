@@ -35,7 +35,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define CMSIS
 #include "SEGGER_RTT.h"
 #include "SEGGER_SYSVIEW.h"
 #include "sdmmc.h"
@@ -68,7 +67,6 @@ void SystemClock_Config(void);
 static void MPU_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-void BSPD(uint16_t brake, uint16_t accel);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -172,7 +170,7 @@ int main(void)
 
 
   /* USER CODE END 3 */
-}
+  }
 }
 
 /**
@@ -251,22 +249,6 @@ uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size){
 
   mask = (1ULL << size) - 1;
   return ((data >> start_bit) & mask);
-}
-
-/// @brief Test for Brake System Plausibility Device making sure that both accel and brake aren't being hard pressed 
-/// @param bse brake pedal position
-/// @param apps accelator position 
-/// @return Returns 0 if fail 1 for succeess  
-void BSPD(uint16_t bse, uint16_t apps){
-  // if(bse >= HARD_BRAKE && apps >= GAS_ON){
-  //   uint8_t data[8];
-
-  //   data[3] = 1;
-
-  //   //turns off drive enable on motor controller
-  //   Prepare_Message(FDCAN1, 0x24, data, 8);
-  // }
-
 }
 
 /* USER CODE END 4 */
