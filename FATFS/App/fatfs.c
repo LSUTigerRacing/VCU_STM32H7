@@ -24,6 +24,9 @@ FATFS SDFatFS;    /* File system object for SD logical drive */
 FIL SDFile;       /* File object for SD */
 
 /* USER CODE BEGIN Variables */
+#define D1_RAM __attribute__((section(".D1_RAM")))
+D1_RAM FATFS SDFatFS;
+D1_RAM FIL SDFile;
 
 /* USER CODE END Variables */
 

@@ -29,7 +29,7 @@
 /* Configure GPIO                                                             */
 /*----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
-
+extern osThreadId_t GPIOTaskHandle;
 /* USER CODE END 1 */
 
 /** Configure pins as
@@ -60,10 +60,14 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, DigOut_3_Pin|DigOut_2_Pin|DigOut_1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : SD_CD_Pin SD_WP_Pin SD_Detect_Pin DigIn_12_Pin
-                           DigIn_8_Pin */
-  GPIO_InitStruct.Pin = SD_CD_Pin|SD_WP_Pin|SD_Detect_Pin|DigIn_12_Pin
-                          |DigIn_8_Pin;
+  /*Configure GPIO pin : PE14 */
+  GPIO_InitStruct.Pin = GPIO_PIN_14;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SD_Detect_Pin DigIn_12_Pin DigIn_8_Pin */
+  GPIO_InitStruct.Pin = SD_Detect_Pin|DigIn_12_Pin|DigIn_8_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
@@ -104,5 +108,54 @@ void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 2 */
+//volatile uint32_t button_state = 0;
 
+extern EventGroupHandle_t VCUGroupEventHandle;
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN)
+{
+//Can adjust later, this is to limit timestamp conflict
+static uint32_t last_time_6 = 0;
+static uint32_t last_time_9 = 0;
+static uint32_t last_time_10 = 0;
+uint32_t now = xTaskGetTickCountFromISR() * portTICK_PERIOD_MS;
+BaseType_t xHigherPriorityTaskWoken = pdFALSE; //Tells RTOS if waking a task requires immediate context switch
+
+switch(GPIO_PIN){
+  case GPIO_PIN_6:
+  {
+    if(now - last_time_6 < DEBOUNCE_MS) break;
+    last_time_6 = now;
+  if (HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_6) == GPIO_PIN_SET){
+  //This replaces the button_state
+  xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_POWER_MODE,&xHigherPriorityTaskWoken);
+  }
+  else if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6) == GPIO_PIN_SET){
+xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_HV_CHECK,&xHigherPriorityTaskWoken);
+}
+  break;
+  }
+  case GPIO_PIN_9:
+  {
+  if(now - last_time_9 < DEBOUNCE_MS) break;
+  last_time_9 = now;
+
+    xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_RTD, &xHigherPriorityTaskWoken);
+  break;
+  }
+
+  case GPIO_PIN_10:
+  {
+  if(now - last_time_10 < DEBOUNCE_MS) break;
+  last_time_10 = now;
+
+  xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_WATER_PUMP, &xHigherPriorityTaskWoken);
+  break;
+  }
+
+  default:
+      break;
+}
+
+portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
 /* USER CODE END 2 */

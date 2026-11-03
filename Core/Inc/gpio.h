@@ -30,10 +30,15 @@ extern "C" {
 
 /* USER CODE BEGIN Includes */
 
+#include "event_groups.h"
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN Private defines */
-
+#define DEBOUNCE_MS 50
+#define BTN_POWER_MODE BIT0
+#define BTN_RTD        BIT1
+#define BTN_WATER_PUMP BIT2
+#define BTN_HV_CHECK   BIT3
 /* USER CODE END Private defines */
 
 void MX_GPIO_Init(void);

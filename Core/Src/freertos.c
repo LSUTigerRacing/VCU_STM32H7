@@ -29,6 +29,10 @@
 #include "fdcan.h"
 #include "adc.h"
 #include "tim.h"
+#include "gpio.h"
+#include "fatfs.h"
+#include "ff.h"
+#include "rtc.h"
 
 extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
 extern void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
@@ -44,11 +48,30 @@ typedef StaticSemaphore_t osStaticSemaphoreDef_t;
 typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE BEGIN PTD */
 
+typedef struct {
+  uint32_t timestamp;
+
+  uint32_t sus_fl;
+  uint32_t sus_fr;
+  uint32_t sus_bl;
+  uint32_t sus_br;
+
+  uint32_t throttle_pos;
+
+  uint32_t steering_ang;
+
+  uint32_t inlet_temp;
+  uint32_t outlet_temp;
+  
+  uint32_t f_brake_press;
+  uint32_t b_brake_press;
+} TelemetryData_t;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define D2_RAM __attribute__((section(".D2_RAM")))
+#define D1_RAM __attribute__((section(".D1_RAM")))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -61,6 +84,7 @@ typedef StaticEventGroup_t osStaticEventGroupDef_t;
 /* USER CODE BEGIN Variables */
 extern TIM_HandleTypeDef htim1;
 extern ADC_HandleTypeDef hadc1;
+extern FATFS SDFatFS;
 
 volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
 volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
@@ -68,6 +92,9 @@ volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 volatile uint32_t test_reading;
 volatile uint32_t pump_speed;
 
+D1_RAM char sd_write_buffer[256] __attribute((aligned(32)));
+
+D1_RAM FIL LogFile;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -78,7 +105,7 @@ const osThreadAttr_t defaultTask_attributes = {
 };
 /* Definitions for ADCTask */
 osThreadId_t ADCTaskHandle;
-uint32_t ADCTaskBuffer[ 128 ];
+uint32_t ADCTaskBuffer[ 256 ];
 osStaticThreadDef_t ADCTaskControlBlock;
 const osThreadAttr_t ADCTask_attributes = {
   .name = "ADCTask",
@@ -172,6 +199,30 @@ const osThreadAttr_t RTDOn_attributes = {
   .stack_size = sizeof(RTDOnBuffer),
   .priority = (osPriority_t) osPriorityRealtime4,
 };
+/* Definitions for GPIOTask */
+osThreadId_t GPIOTaskHandle;
+uint32_t GPIOTaskBuffer[ 128 ];
+osStaticThreadDef_t GPIOTaskControlBlock;
+const osThreadAttr_t GPIOTask_attributes = {
+  .name = "GPIOTask",
+  .cb_mem = &GPIOTaskControlBlock,
+  .cb_size = sizeof(GPIOTaskControlBlock),
+  .stack_mem = &GPIOTaskBuffer[0],
+  .stack_size = sizeof(GPIOTaskBuffer),
+  .priority = (osPriority_t) osPriorityNormal3,
+};
+/* Definitions for LoggingTask */
+osThreadId_t LoggingTaskHandle;
+uint32_t LoggingTaskBuffer[ 1024 ];
+osStaticThreadDef_t LoggingTaskControlBlock;
+const osThreadAttr_t LoggingTask_attributes = {
+  .name = "LoggingTask",
+  .cb_mem = &LoggingTaskControlBlock,
+  .cb_size = sizeof(LoggingTaskControlBlock),
+  .stack_mem = &LoggingTaskBuffer[0],
+  .stack_size = sizeof(LoggingTaskBuffer),
+  .priority = (osPriority_t) osPriorityLow1,
+};
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
 uint8_t CAN1rxQBuffer[ 16 * sizeof( CAN_Msg_Raw ) ];
@@ -215,6 +266,17 @@ const osMessageQueueAttr_t CAN2txQ_attributes = {
   .cb_size = sizeof(CAN2txQControlBlock),
   .mq_mem = &CAN2txQBuffer,
   .mq_size = sizeof(CAN2txQBuffer)
+};
+/* Definitions for LogQ */
+osMessageQueueId_t LogQHandle;
+uint8_t LogQBuffer[ 512 * sizeof( TelemetryData_t ) ];
+osStaticMessageQDef_t LogQControlBlock;
+const osMessageQueueAttr_t LogQ_attributes = {
+  .name = "LogQ",
+  .cb_mem = &LogQControlBlock,
+  .cb_size = sizeof(LogQControlBlock),
+  .mq_mem = &LogQBuffer,
+  .mq_size = sizeof(LogQBuffer)
 };
 /* Definitions for CAN1txM */
 osMutexId_t CAN1txMHandle;
@@ -288,6 +350,14 @@ const osEventFlagsAttr_t RTD_attributes = {
   .cb_mem = &RTDControlBlock,
   .cb_size = sizeof(RTDControlBlock),
 };
+/* Definitions for VCUGroupEvent */
+osEventFlagsId_t VCUGroupEventHandle;
+osStaticEventGroupDef_t VCUGroupEventControlBlock;
+const osEventFlagsAttr_t VCUGroupEvent_attributes = {
+  .name = "VCUGroupEvent",
+  .cb_mem = &VCUGroupEventControlBlock,
+  .cb_size = sizeof(VCUGroupEventControlBlock),
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -303,6 +373,8 @@ void StartCreateMsgCAN2(void *argument);
 void StartPWMTask(void *argument);
 void StartRTDSM(void *argument);
 void StartRTDOn(void *argument);
+void StartTaskGPIO(void *argument);
+void StartLoggingTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -313,7 +385,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+  //Creation of Event group
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of CAN1txM */
@@ -330,6 +402,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
+
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
@@ -366,6 +439,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN2txQ */
   CAN2txQHandle = osMessageQueueNew (16, sizeof(CAN_Msg_Raw), &CAN2txQ_attributes);
 
+  /* creation of LogQ */
+  LogQHandle = osMessageQueueNew (512, sizeof(TelemetryData_t), &LogQ_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -397,13 +473,20 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of RTDOn */
   RTDOnHandle = osThreadNew(StartRTDOn, NULL, &RTDOn_attributes);
+  /* creation of GPIOTask */
+  GPIOTaskHandle = osThreadNew(StartTaskGPIO, NULL, &GPIOTask_attributes);
+  /* creation of LoggingTask */
+  LoggingTaskHandle = osThreadNew(StartLoggingTask, NULL, &LoggingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+
   /* USER CODE END RTOS_THREADS */
 
   /* creation of RTD */
   RTDHandle = osEventFlagsNew(&RTD_attributes);
+  /* creation of VCUGroupEvent */
+  VCUGroupEventHandle = osEventFlagsNew(&VCUGroupEvent_attributes);
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
@@ -425,7 +508,7 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+  osDelay(1);
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -446,6 +529,8 @@ void StartADCTask(void *argument)
   HAL_TIM_Base_Start(&htim1);
 
   uint8_t can_data[8] = {0};
+  TelemetryData_t currentData;
+
   /* Infinite loop */
   for(;;)
   {
@@ -477,8 +562,27 @@ void StartADCTask(void *argument)
     else{
       HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_RESET);
     }
+    
+    currentData.timestamp = HAL_GetTick();
+
+    currentData.sus_fl = sus_fl.avg;
+    currentData.sus_fr = sus_fr.avg;
+    currentData.sus_bl = sus_bl.avg;
+    currentData.sus_br = sus_br.avg;
+
+    currentData.throttle_pos = throttle_pos.avg;
+
+    currentData.steering_ang = steering_ang.avg;
+
+    currentData.inlet_temp = inlet_temp.avg;
+    currentData.outlet_temp = outlet_temp.avg;
+
+    currentData.f_brake_press = f_brake_press.avg;
+    currentData.b_brake_press = b_brake_press.avg;
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    osMessageQueuePut(LogQHandle, &currentData, 0, 0);
   }
   /* USER CODE END StartADCTask */
 }
@@ -543,7 +647,7 @@ void StartDecodeCAN1(void *argument)
 
       default:
       Error_Handler();
-    } 
+    }
     osDelay(1);
   }
   /* USER CODE END StartDecodeCAN1 */
@@ -678,9 +782,130 @@ void StartRTDOn(void *argument)
   }
   /* USER CODE END StartRTDOn */
 }
+/* USER CODE BEGIN Header_StartTaskGPIO */
+/**
+* @brief Function implementing the GPIOTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTaskGPIO */
+void StartTaskGPIO(void *argument)
+{
+  /* USER CODE BEGIN StartTaskGPIO */
+  /* Infinite loop */
+  EventBits_t uxBits;
+  for (;;)
+  {
+    uxBits = xEventGroupWaitBits(
+      VCUGroupEventHandle,
+      (BTN_POWER_MODE|BTN_RTD|BTN_WATER_PUMP|BTN_HV_CHECK),
+      pdTRUE,
+      pdFALSE,
+      portMAX_DELAY
+    );
+
+    if((uxBits & BTN_POWER_MODE) != 0){
+      //Should Check that power is being delieverd
+      return;
+    }
+
+    if ((uxBits & BTN_HV_CHECK) != 0){
+
+      //Check if were above 60V
+
+        return;
+      }
+    }
+
+    if ((uxBits & BTN_RTD) !=0) {
+
+      //All tests should pass, if any failure we should then iniatiate a shutdow
+      return;
+    }
+
+    if ((uxBits & BTN_WATER_PUMP) != 0){
+      //Pass water through the system
+
+        return;
+    }
+    osDelay(1);
+
+  }
+  /* USER CODE END StartTaskGPIO */
+
+/* USER CODE BEGIN Header_StartLoggingTask */
+/**
+* @brief Function implementing the LoggingTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartLoggingTask */
+void StartLoggingTask(void *argument)
+{
+  /* USER CODE BEGIN StartLoggingTask */
+  UINT bytesWritten;
+  TelemetryData_t rxData;
+  RTC_TimeTypeDef time;
+  RTC_DateTypeDef date;
+  static char dirName[16];
+  static char fileName[32];
+  static uint8_t done = 0;
+
+  HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
+
+  snprintf(dirName, sizeof(dirName), "%02u-%02u", date.Month, date.Date);
+
+  FRESULT fRes = f_mount(&SDFatFS, "", 1);
+  if (fRes != FR_OK) osThreadExit();
+
+  // Uncomment this to test more than one log file
+  fRes = f_mkdir(dirName);
+  if (fRes != FR_OK && fRes != FR_EXIST) osThreadExit();
+
+  fRes = f_chdir(dirName);
+  if (fRes != FR_OK) osThreadExit();
+
+  int i = 0;
+  while (!done) {
+    snprintf(fileName, sizeof(fileName), "log_%02u.csv", i);
+    fRes = f_open(&LogFile, fileName, FA_CREATE_NEW | FA_WRITE);
+    if (fRes == FR_OK) done = 1;
+    else i++;
+    if (i == 1000) break;
+  }
+
+  int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "TIME, SUSPENSION FL, SUSPENSION FR, SUSPENSION BL, SUSPENSION BR, STEERING ANGLE, THROTTLE POSITION, INLET TEMPERATURE, OUTLET TEMPERATURE, FRONT BRAKE PRESSURE, BACK BRAKE PRESSURE\n");
+  f_write(&LogFile, &sd_write_buffer, len, &bytesWritten);
+  /* Infinite loop */
+  for(;;)
+  {
+
+    if (osMessageQueueGet(LogQHandle, &rxData, NULL, osWaitForever) == osOK) {
+      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", 
+      rxData.timestamp,
+      rxData.sus_fl,
+      rxData.sus_fr,
+      rxData.sus_bl,
+      rxData.sus_br,
+      rxData.throttle_pos,
+      rxData.steering_ang,
+      rxData.inlet_temp,
+      rxData.outlet_temp,
+      rxData.f_brake_press,
+      rxData.b_brake_press
+    );
+      if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK){
+        fRes = f_sync(&LogFile);
+      }
+    }
+
+    osDelay(1);
+  }
+  /* USER CODE END StartLoggingTask */
+}
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
 /* USER CODE END Application */
-
