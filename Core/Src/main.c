@@ -82,17 +82,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-
-
-  /* USER CODE END 3 */
-
-
-
-
+  CAN_Decoded_Values bms_fault;
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -181,7 +171,7 @@ int main(void)
 
 
   /* USER CODE END 3 */
-}
+  }
 }
 
 /**
@@ -261,6 +251,7 @@ uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size){
   mask = (1ULL << size) - 1;
   return ((data >> start_bit) & mask);
 }
+
 /* USER CODE END 4 */
 
  /* MPU Configuration */

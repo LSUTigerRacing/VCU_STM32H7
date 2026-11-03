@@ -32,7 +32,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #ifndef CMSIS
-#define CMSIS
+#define CMSIS 1
 #include "cmsis_os2.h"
 #include "FreeRTOS.h"
 #include "task.h"
