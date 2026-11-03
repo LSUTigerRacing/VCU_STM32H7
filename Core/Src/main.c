@@ -35,7 +35,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define CMSIS
 #include "SEGGER_RTT.h"
 #include "SEGGER_SYSVIEW.h"
 #include "sdmmc.h"
@@ -59,7 +58,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+CAN_Decoded_Values bms_fault;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -67,7 +66,7 @@ void SystemClock_Config(void);
 static void MPU_Config(void);
 void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-
+extern CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -141,6 +140,23 @@ int main(void)
   MX_OCTOSPI1_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+
+  //startup info
+  HAL_GPIO_WritePin(GPIOD, 15, GPIO_PIN_SET); //Power for fault latch
+  HAL_Delay(5000); //wait for 5 seconds
+
+  //get bms_fault
+  bms_fault = Get_Signal(0x16, 3);
+  while(bms_fault.uint8 > 0){
+    //infinite loop until bms unfaults
+    bms_fault = Get_Signal(0x16, 3);
+  }
+  
+  //Lamp check (E.V. 6.3) page 101
+  HAL_GPIO_WritePin(GPIOC, 8, GPIO_PIN_SET); //Highside driver for the lights
+  HAL_Delay(2500);
+  HAL_GPIO_WritePin(GPIOC, 8, GPIO_PIN_RESET);
+
   SEGGER_RTT_Init();
   SEGGER_SYSVIEW_Conf();
   MX_SDMMC1_SD_Init();

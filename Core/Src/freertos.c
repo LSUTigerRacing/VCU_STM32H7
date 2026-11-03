@@ -186,6 +186,7 @@ const osThreadAttr_t GPIOTask_attributes = {
   .stack_mem = &GPIOTaskBuffer[0],
   .stack_size = sizeof(GPIOTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal3,
+};
 /* Definitions for LoggingTask */
 osThreadId_t LoggingTaskHandle;
 uint32_t LoggingTaskBuffer[ 1024 ];
