@@ -172,18 +172,6 @@ const osThreadAttr_t PWMTask_attributes = {
   .stack_size = sizeof(PWMTaskBuffer),
   .priority = (osPriority_t) osPriorityNormal4,
 };
-/* Definitions for GPIOTask */
-osThreadId_t GPIOTaskHandle;
-uint32_t GPIOTaskBuffer[ 128 ];
-osStaticThreadDef_t GPIOTaskControlBlock;
-const osThreadAttr_t GPIOTask_attributes = {
-  .name = "GPIOTask",
-  .cb_mem = &GPIOTaskControlBlock,
-  .cb_size = sizeof(GPIOTaskControlBlock),
-  .stack_mem = &GPIOTaskBuffer[0],
-  .stack_size = sizeof(GPIOTaskBuffer),
-  .priority = (osPriority_t) osPriorityNormal3,
-};
 /* Definitions for LoggingTask */
 osThreadId_t LoggingTaskHandle;
 uint32_t LoggingTaskBuffer[ 1024 ];
