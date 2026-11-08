@@ -856,7 +856,7 @@ void StartTaskGPIO(void *argument)
 
       can_data[0] = (uint8_t) (data & 0xFF);
       can_data[1] = (uint8_t)((data >> 8) & 0xFF);
-      Prepare_Message(&hfdcan1, 0x05, can_data, 2);
+      Prepare_Message(&hfdcan1, 0x05, can_data, 2); //relative set AC current could use normal
     }
 
     if ((uxBits & BTN_HV_CHECK) != 0){
@@ -869,7 +869,7 @@ void StartTaskGPIO(void *argument)
     if ((uxBits & BTN_RTD) !=0) {
       //pin not confirmed
       if(HAL_GPIO_ReadPin(GPIOE,1)){
-      osEventFlagsSet(RTDHandle, RTD_BUTT); 
+        osEventFlagsSet(RTDHandle, RTD_BUTT); 
       }
       else{
         osEventFlagsClear(RTDHandle, 1);
