@@ -75,6 +75,7 @@ typedef struct {
 /* USER CODE BEGIN PM */
 #define RTD_ON    BIT0
 #define RTD_BUZZ  BIT1
+#define RTD_BUTT  BIT2
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -92,6 +93,15 @@ volatile uint32_t pump_speed;
 D1_RAM char sd_write_buffer[256] __attribute((aligned(32)));
 
 D1_RAM FIL LogFile;
+
+typedef enum{
+  Eco,
+  Normal,
+  Sport
+}Powermodes;
+
+static volatile Powermodes power;
+power = Normal;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -818,8 +828,36 @@ void StartTaskGPIO(void *argument)
     );
 
     if((uxBits & BTN_POWER_MODE) != 0){
+      uint8_t can_data[2] = {0};
+      int16_t data;
+
       //Should Check that power is being delieverd
-      return;
+      //alt
+      //power = (power + 1) % 3;
+      switch(power){
+        case Normal:
+          power = Sport;
+          data = 1000; //100%
+          break;
+
+        case Sport:
+          power = Eco;
+          data = 700; //70%
+          break;
+
+        case Eco:
+          power = Normal;
+          data = 850; //85%
+          break;
+
+        default:
+          power = Normal;
+          data =  850;
+      }
+
+      can_data[0] = (uint8_t) (data & 0xFF);
+      can_data[1] = (uint8_t)((data >> 8) & 0xFF);
+      Prepare_Message(&hfdcan1, 0x05, can_data, 2); //relative set AC current could use normal
     }
 
     if ((uxBits & BTN_HV_CHECK) != 0){
@@ -830,9 +868,15 @@ void StartTaskGPIO(void *argument)
     }
 
     if ((uxBits & BTN_RTD) !=0) {
-
+      //pin not confirmed
+      if(HAL_GPIO_ReadPin(GPIOE,1)){
+        osEventFlagsSet(RTDHandle, RTD_BUTT); 
+      }
+      else{
+        osEventFlagsClear(RTDHandle, 1);
+      }
       //All tests should pass, if any failure we should then iniatiate a shutdow
-      return;
+    
     }
 
     if ((uxBits & BTN_WATER_PUMP) != 0){
@@ -899,6 +943,7 @@ void StartRTDOn(void *argument)
   /* Infinite loop */
   for(;;)
   {
+    osEventFlagsWait(RTDHandle,RTD_BUTT,osFlagsNoClear,osWaitForever);
     if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
       osEventFlagsSet(RTDHandle, RTD_BUZZ);
     }
