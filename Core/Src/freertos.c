@@ -852,6 +852,7 @@ void StartTaskGPIO(void *argument)
 
         default:
           power = Normal;
+          data =  850;
       }
 
       can_data[0] = (uint8_t) (data & 0xFF);
