@@ -73,9 +73,10 @@ typedef struct {
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define RTD_ON    BIT0
-#define RTD_BUZZ  BIT1
-#define RTD_BUTT  BIT2
+#define RTD_ON      BIT0
+#define RTD_BUZZ    BIT1
+#define RTD_BUTT    BIT2
+#define MC_MAX_OUTPUT  500
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -101,7 +102,14 @@ typedef enum{
 }Powermodes;
 
 static volatile Powermodes power;
-power = Normal;
+
+//sigmoid function
+static uint16_t throttle_curve[11] = {
+0, 302, 519, 707, 881, 1050, 1219, 1393, 1581, 1798, 2100
+};
+
+static uint8_t max_perc = 80;
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -540,7 +548,7 @@ void StartADCTask(void *argument)
 
   uint8_t can_data[8] = {0};
   TelemetryData_t currentData;
-
+  uint8_t perc = 0;
   /* Infinite loop */
   for(;;)
   {
@@ -555,15 +563,31 @@ void StartADCTask(void *argument)
 
     throttle_pos.avg = (throttle_pos.data1 + throttle_pos.data2) / 2;
 
+    if(throttle_pos.avg >= throttle_curve[10]){
+      perc = 100;
+    }
+    else if(throttle_pos.avg <= throttle_curve[0]){
+      perc = 0;
+    }
+    else{
+      for(uint8_t i = 1; i < 10; i++){
+        if(throttle_pos.avg <= throttle_curve[i]){
+          //left side of the equation finds the tens position of the percentage while the right finds the ones position
+          perc = ((i - 1) * 10) + ((throttle_pos.avg - throttle_curve[i-1]) / (throttle_curve[i] - throttle_curve[i-1])); 
+        }
+      }
+    }
+    perc *= 10;
+    can_data[0] = (uint8_t) (perc & 0xFF);
+    can_data[1] = (uint8_t) ((perc >> 8) & 0xFF);
+
+    Prepare_Message(&hfdcan1, 0x05, can_data, 2); //for relative output current (find real id)
+
     inlet_temp.avg = (inlet_temp.data1 + inlet_temp.data2) / 2;
     outlet_temp.avg = (outlet_temp.data1 + outlet_temp.data2) / 2;
 
     f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
     b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
-
-    //implement throttle curve
-    
-    Prepare_Message(&hfdcan1, 0x16, can_data, 8); //add actual can id for throttle input
 
     //put actual brake light pin
     if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
@@ -830,34 +854,40 @@ void StartTaskGPIO(void *argument)
     if((uxBits & BTN_POWER_MODE) != 0){
       uint8_t can_data[2] = {0};
       int16_t data;
-
-      //Should Check that power is being delieverd
+      
       //alt
       //power = (power + 1) % 3;
       switch(power){
         case Normal:
           power = Sport;
-          data = 1000; //100%
+          data = MC_MAX_OUTPUT * 10; //max output
+          max_perc = 100;
+
           break;
 
         case Sport:
           power = Eco;
-          data = 700; //70%
+          data = (int16_t)(MC_MAX_OUTPUT * .7) * 10; //70%
+          max_perc = 70;
           break;
 
         case Eco:
           power = Normal;
-          data = 850; //85%
+          data = (int16_t)(MC_MAX_OUTPUT * .85) *10; //85%
+          max_perc = 85;
+
           break;
 
         default:
           power = Normal;
-          data =  850;
+          data = (int16_t)(MC_MAX_OUTPUT * .85) *10; //85%
+          max_perc = 85;
+
       }
 
       can_data[0] = (uint8_t) (data & 0xFF);
       can_data[1] = (uint8_t)((data >> 8) & 0xFF);
-      Prepare_Message(&hfdcan1, 0x05, can_data, 2); //relative set AC current could use normal
+      Prepare_Message(&hfdcan1, 0x08, can_data, 2); //sets max current based on motor controller max
     }
 
     if ((uxBits & BTN_HV_CHECK) != 0){
