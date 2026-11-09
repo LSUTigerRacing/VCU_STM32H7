@@ -73,10 +73,10 @@ typedef struct {
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define RTD_ON      BIT0
-#define RTD_BUZZ    BIT1
-#define RTD_BUTT    BIT2
-#define MC_MAX_OUTPUT  500
+#define RTD_ON                BIT0
+#define RTD_BUZZ              BIT1
+#define RTD_BUTT              BIT2
+#define MC_MAX_OUTPUT         500
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -854,7 +854,7 @@ void StartTaskGPIO(void *argument)
     if((uxBits & BTN_POWER_MODE) != 0){
       uint8_t can_data[2] = {0};
       int16_t data;
-      
+
       //alt
       //power = (power + 1) % 3;
       switch(power){
