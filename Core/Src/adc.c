@@ -44,6 +44,7 @@ volatile ADC_Data steering_ang;
 
 // Throttle pedal position
 volatile ADC_Data throttle_pos;
+volatile ADC_Data throttle_pos2;
 
 // Radiator inlet/outlet temperature
 volatile ADC_Data inlet_temp;
@@ -87,12 +88,23 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 
     b_brake_press.data1 = adc12_dma_buf[B_BRAKE] & 0xFFFF; 
     b_brake_press.data2 = adc12_dma_buf[B_BRAKE] >> 16;
+  }
 
+  else if(hadc->Instance == ADC3){
+    throttle_pos2.data1 = adc3_dma_buf[APPS2] & 0xFFFF;
   }
 
   //BSPD check
   if( (throttle_pos.data1 + throttle_pos.data2)>= HARD_ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
     osEventFlagsClear(RTDHandle, RTD_ON);
+  }
+
+  //APPS check
+  uint32_t high = (throttle_pos.data1 > throttle_pos2.data1) ? throttle_pos.data1 : throttle_pos2.data1;
+  uint32_t low = (throttle_pos.data1 > throttle_pos2.data1) ? throttle_pos2.data1 : throttle_pos.data1;
+  uint64_t diff= high - low;
+  if(diff * 10 > high){
+    osEventFlagsClear(RTDHandle,RTD_ON);
   }
 
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
