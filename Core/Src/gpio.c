@@ -131,7 +131,7 @@ switch(GPIO_PIN){
   xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_POWER_MODE,&xHigherPriorityTaskWoken);
   }
   else if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6) == GPIO_PIN_SET){
-xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_HV_CHECK,&xHigherPriorityTaskWoken);
+  xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_HV_CHECK,&xHigherPriorityTaskWoken);
 }
   break;
   }
