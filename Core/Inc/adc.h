@@ -41,30 +41,33 @@ extern ADC_HandleTypeDef hadc3;
 /* USER CODE BEGIN Private defines */
 
 /* BEGIN Defines*/
+#define D3_RAM __attribute__((section(".D3_RAM")))
 #define D2_RAM __attribute__((section(".D2_RAM")))
 
 #define ADC12_BUFFER_COUNT 10
-#define ADC3_BUFFER_COUNT 4
+#define ADC3_BUFFER_COUNT 1
 
-// Suspention (Front/Back Left/Right) shock travel potentiometer pins
+// Suspention (Front/Back Left/Right) shock travel potentiometer channels
 #define SUS_FL 0
 #define SUS_FR 1
 #define SUS_BL 2
 #define SUS_BR 3
 
-// Steering angle potentiometer pin
+// Steering angle potentiometer channel
 #define STEERING 4
 
-// Throttle pedal position potentiometer pin
+// Throttle pedal position potentiometer channel
 #define THROTTLE 5
 
-// Radiator inlet/outlet temp pin
+// Radiator inlet/outlet temp channel
 #define INLET 6
 #define OUTLET 7
 
-// Brake pressure pin
+// Brake pressure channel
 #define F_BRAKE 8
 #define B_BRAKE 9
+// APPS2 channel
+#define APPS2 0
 
 #define HARD_BRAKE   2000
 #define BRAKE_ON     250
@@ -83,7 +86,7 @@ typedef struct {
 
 /* BEGIN Extern */
 extern volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
-extern volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
+extern volatile D3_RAM uint16_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 
 // Sensor definitions
 
@@ -98,6 +101,9 @@ extern volatile ADC_Data steering_ang;
 
 // Throttle pedal position
 extern volatile ADC_Data throttle_pos;
+
+// Apps 2
+extern volatile ADC_Data apps2;
 
 // Radiator inlet/outlet temperature
 extern volatile ADC_Data inlet_temp;

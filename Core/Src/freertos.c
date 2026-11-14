@@ -54,6 +54,7 @@ typedef struct {
   uint32_t sus_br;
 
   uint32_t throttle_pos;
+  uint32_t apps2;
 
   uint32_t steering_ang;
 
@@ -67,6 +68,7 @@ typedef struct {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define D3_RAM __attribute__((section(".D3_RAM")))
 #define D2_RAM __attribute__((section(".D2_RAM")))
 #define D1_RAM __attribute__((section(".D1_RAM")))
 /* USER CODE END PD */
@@ -86,7 +88,7 @@ extern ADC_HandleTypeDef hadc1;
 extern FATFS SDFatFS;
 
 volatile D2_RAM uint32_t adc12_dma_buf[ADC12_BUFFER_COUNT];
-volatile D2_RAM uint32_t adc3_dma_buf[ADC3_BUFFER_COUNT];
+volatile D3_RAM uint16_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 
 volatile uint32_t test_reading;
 volatile uint32_t pump_speed;
@@ -543,6 +545,7 @@ void StartADCTask(void *argument)
   /* USER CODE BEGIN StartADCTask */
 
   HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
+  HAL_ADCEx_Calibration_Start(&hadc3, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
 
   HAL_TIM_Base_Start(&htim1);
 
@@ -553,6 +556,7 @@ void StartADCTask(void *argument)
   for(;;)
   {
     HAL_ADCEx_MultiModeStart_DMA(&hadc1, (uint32_t*) adc12_dma_buf, ADC12_BUFFER_COUNT);
+    HAL_ADC_Start_DMA(&hadc3, (uint32_t*) adc3_dma_buf, ADC3_BUFFER_COUNT);
 
     sus_fl.avg = (sus_fl.data1 + sus_fl.data2) / 2;
     sus_fr.avg = (sus_fr.data1 + sus_fr.data2) / 2;
@@ -562,6 +566,7 @@ void StartADCTask(void *argument)
     steering_ang.avg = (steering_ang.data1 + steering_ang.data2) / 2;
 
     throttle_pos.avg = (throttle_pos.data1 + throttle_pos.data2) / 2;
+    apps2.avg = apps2.data1;
 
     if(throttle_pos.avg >= throttle_curve[10]){
       perc = 100;
@@ -605,6 +610,7 @@ void StartADCTask(void *argument)
     currentData.sus_br = sus_br.avg;
 
     currentData.throttle_pos = throttle_pos.avg;
+    currentData.apps2 =  apps2.avg;
 
     currentData.steering_ang = steering_ang.avg;
 
@@ -799,20 +805,21 @@ void StartLoggingTask(void *argument)
     if (i == 1000) break;
   }
 
-  int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "TIME, SUSPENSION FL, SUSPENSION FR, SUSPENSION BL, SUSPENSION BR, STEERING ANGLE, THROTTLE POSITION, INLET TEMPERATURE, OUTLET TEMPERATURE, FRONT BRAKE PRESSURE, BACK BRAKE PRESSURE\n");
+  int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "TIME, SUSPENSION FL, SUSPENSION FR, SUSPENSION BL, SUSPENSION BR, THROTTLE POSITION, APPS2, STEERING ANGLE, INLET TEMPERATURE, OUTLET TEMPERATURE, FRONT BRAKE PRESSURE, BACK BRAKE PRESSURE\n");
   f_write(&LogFile, &sd_write_buffer, len, &bytesWritten);
   /* Infinite loop */
   for(;;)
   {
 
     if (osMessageQueueGet(LogQHandle, &rxData, NULL, osWaitForever) == osOK) {
-      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", 
+      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", 
       rxData.timestamp,
       rxData.sus_fl,
       rxData.sus_fr,
       rxData.sus_bl,
       rxData.sus_br,
       rxData.throttle_pos,
+      rxData.apps2,
       rxData.steering_ang,
       rxData.inlet_temp,
       rxData.outlet_temp,
@@ -820,7 +827,7 @@ void StartLoggingTask(void *argument)
       rxData.b_brake_press
     );
       if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK){
-        fRes = f_sync(&LogFile);
+        // fRes = f_sync(&LogFile);
       }
     }
 
