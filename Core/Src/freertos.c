@@ -827,7 +827,7 @@ void StartLoggingTask(void *argument)
       rxData.b_brake_press
     );
       if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK){
-        // fRes = f_sync(&LogFile);
+        fRes = f_sync(&LogFile);
       }
     }
 
