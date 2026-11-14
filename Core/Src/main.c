@@ -21,6 +21,7 @@
 #include "FreeRTOS.h"
 #include "cmsis_os2.h"
 #include "adc.h"
+#include "bdma.h"
 #include "dac.h"
 #include "dma.h"
 #include "fatfs.h"
@@ -108,6 +109,7 @@ int main(void)
   MX_GPIO_Init();
   MX_MDMA_Init();
   MX_DMA_Init();
+  MX_BDMA_Init();
   MX_ADC1_Init();
   MX_FDCAN1_Init();
   MX_FDCAN2_Init();
@@ -127,6 +129,7 @@ int main(void)
   MX_TIM13_Init();
   MX_TIM14_Init();
   MX_FATFS_Init();
+  MX_RTC_Init();
   MX_OCTOSPI1_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
