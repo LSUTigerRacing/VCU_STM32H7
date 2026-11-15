@@ -241,6 +241,14 @@ SECTIONS
     . = ALIGN(8);
   } >DTCMRAM
 
+  .D3_RAM (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.D3_RAM)
+    *(.D3_RAM*)
+    . = ALIGN (4);
+  } >RAM_D3
+
   .D2_RAM (NOLOAD) :
   {
     . = ALIGN(4);
