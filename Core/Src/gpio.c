@@ -132,7 +132,7 @@ switch(GPIO_PIN){
   }
   else if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_6) == GPIO_PIN_SET){
   xEventGroupSetBitsFromISR(VCUGroupEventHandle, BTN_HV_CHECK,&xHigherPriorityTaskWoken);
-}
+  }
   break;
   }
   case GPIO_PIN_9:

@@ -44,7 +44,7 @@ volatile ADC_Data steering_ang;
 
 // Throttle pedal position
 volatile ADC_Data throttle_pos;
-volatile ADC_Data throttle_pos2;
+volatile ADC_Data app2;
 
 // Apps 2
 volatile ADC_Data apps2;
@@ -93,10 +93,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     b_brake_press.data2 = adc12_dma_buf[B_BRAKE] >> 16;
   }
 
-  else if(hadc->Instance == ADC3){
-    throttle_pos2.data1 = adc3_dma_buf[APPS2] & 0xFFFF;
-  }
-
   if (hadc->Instance == ADC3) {
     apps2.data1 = adc3_dma_buf[APPS2] & 0xFFFF;
     apps2.data2 = apps2.data1;
@@ -108,8 +104,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
   }
 
   //APPS check
-  uint32_t high = (throttle_pos.data1 > throttle_pos2.data1) ? throttle_pos.data1 : throttle_pos2.data1;
-  uint32_t low = (throttle_pos.data1 > throttle_pos2.data1) ? throttle_pos2.data1 : throttle_pos.data1;
+  uint32_t high = (apps2.data1 > app2.data1) ? throttle_pos.data1 : app2.data1;
+  uint32_t low = (throttle_pos.data1 > app2.data1) ? app2.data1 : throttle_pos.data1;
   uint64_t diff= high - low;
   if(diff * 10 > high){
     osEventFlagsClear(RTDHandle,RTD_ON);
