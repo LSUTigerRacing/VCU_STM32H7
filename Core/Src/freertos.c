@@ -875,7 +875,7 @@ void StartLoggingTask(void *argument)
 
     writeCtr++;
     if (osMessageQueueGet(ADCLogQHandle, &ADCData, NULL, osWaitForever) == osOK && osMessageQueueGet(CANLogQHandle, &CANData, NULL, osWaitForever) == osOK) {
-      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu,%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu", 
+      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu,%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", 
       ADCData.timestamp,
       ADCData.sus_fl,
       ADCData.sus_fr,
