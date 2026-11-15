@@ -58,6 +58,7 @@ extern ADC_HandleTypeDef hadc3;
 
 // Throttle pedal position potentiometer channel
 #define THROTTLE 5
+#define APPS2    0
 
 // Radiator inlet/outlet temp channel
 #define INLET 6
@@ -101,6 +102,7 @@ extern volatile ADC_Data steering_ang;
 
 // Throttle pedal position
 extern volatile ADC_Data throttle_pos;
+extern volatile ADC_Data throttle_pos2;
 
 // Apps 2
 extern volatile ADC_Data apps2;
