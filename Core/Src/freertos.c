@@ -63,7 +63,34 @@ typedef struct {
   
   uint32_t f_brake_press;
   uint32_t b_brake_press;
+
+  CAN_Decoded_Values BMS_1;
+  CAN_Decoded_Values BMS_2;
+
+  CAN_Decoded_Values DTI_1;
+  CAN_Decoded_Values DTI_2;
+  CAN_Decoded_Values DTI_3;
+  CAN_Decoded_Values DTI_4;
+  CAN_Decoded_Values DTI_5;
+
+  CAN_Decoded_Values COOL_IN;
+  CAN_Decoded_Values COOL_OUT;
+  CAN_Decoded_Values COOL_FLOW;
+
+  CAN_Decoded_Values BRAKE_PSI;
+
+  CAN_Decoded_Values WHEEL1;
+  CAN_Decoded_Values WHEEL2;
+
+  CAN_Decoded_Values ROTOR1;
+  CAN_Decoded_Values ROTOR2;
 } TelemetryData_t;
+
+typedef enum{
+  Eco,
+  Normal,
+  Sport
+}Powermodes;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -93,15 +120,9 @@ volatile D3_RAM uint16_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 volatile uint32_t test_reading;
 volatile uint32_t pump_speed;
 
-D1_RAM char sd_write_buffer[256] __attribute((aligned(32)));
+D1_RAM char sd_write_buffer[512] __attribute((aligned(32)));
 
 D1_RAM FIL LogFile;
-
-typedef enum{
-  Eco,
-  Normal,
-  Sport
-}Powermodes;
 
 static volatile Powermodes power;
 
@@ -284,16 +305,27 @@ const osMessageQueueAttr_t CAN2txQ_attributes = {
   .mq_mem = &CAN2txQBuffer,
   .mq_size = sizeof(CAN2txQBuffer)
 };
-/* Definitions for LogQ */
-osMessageQueueId_t LogQHandle;
-uint8_t LogQBuffer[ 512 * sizeof( TelemetryData_t ) ];
-osStaticMessageQDef_t LogQControlBlock;
-const osMessageQueueAttr_t LogQ_attributes = {
-  .name = "LogQ",
-  .cb_mem = &LogQControlBlock,
-  .cb_size = sizeof(LogQControlBlock),
-  .mq_mem = &LogQBuffer,
-  .mq_size = sizeof(LogQBuffer)
+/* Definitions for ADCLogQ */
+osMessageQueueId_t ADCLogQHandle;
+uint8_t ADCLogQBuffer[ 64 * sizeof( TelemetryData_t ) ];
+osStaticMessageQDef_t ADCLogQControlBlock;
+const osMessageQueueAttr_t ADCLogQ_attributes = {
+  .name = "ADCLogQ",
+  .cb_mem = &ADCLogQControlBlock,
+  .cb_size = sizeof(ADCLogQControlBlock),
+  .mq_mem = &ADCLogQBuffer,
+  .mq_size = sizeof(ADCLogQBuffer)
+};
+/* Definitions for CANLogQ */
+osMessageQueueId_t CANLogQHandle;
+uint8_t CANLogQBuffer[ 16 * sizeof( TelemetryData_t ) ];
+osStaticMessageQDef_t CANLogQControlBlock;
+const osMessageQueueAttr_t CANLogQ_attributes = {
+  .name = "CANLogQ",
+  .cb_mem = &CANLogQControlBlock,
+  .cb_size = sizeof(CANLogQControlBlock),
+  .mq_mem = &CANLogQBuffer,
+  .mq_size = sizeof(CANLogQBuffer)
 };
 /* Definitions for CAN1txM */
 osMutexId_t CAN1txMHandle;
@@ -456,8 +488,11 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN2txQ */
   CAN2txQHandle = osMessageQueueNew (16, sizeof(CAN_Msg_Raw), &CAN2txQ_attributes);
 
-  /* creation of LogQ */
-  LogQHandle = osMessageQueueNew (512, sizeof(TelemetryData_t), &LogQ_attributes);
+  /* creation of ADCLogQ */
+  ADCLogQHandle = osMessageQueueNew (64, sizeof(TelemetryData_t), &ADCLogQ_attributes);
+
+  /* creation of CANLogQ */
+  CANLogQHandle = osMessageQueueNew (16, sizeof(TelemetryData_t), &CANLogQ_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -549,8 +584,9 @@ void StartADCTask(void *argument)
 
   HAL_TIM_Base_Start(&htim1);
 
+  TelemetryData_t adcData;
+
   uint8_t can_data[8] = {0};
-  TelemetryData_t currentData;
   uint8_t perc = 0;
   /* Infinite loop */
   for(;;)
@@ -602,27 +638,27 @@ void StartADCTask(void *argument)
       HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_RESET);
     }
     
-    currentData.timestamp = HAL_GetTick();
+    adcData.timestamp = HAL_GetTick();
 
-    currentData.sus_fl = sus_fl.avg;
-    currentData.sus_fr = sus_fr.avg;
-    currentData.sus_bl = sus_bl.avg;
-    currentData.sus_br = sus_br.avg;
+    adcData.sus_fl = sus_fl.avg;
+    adcData.sus_fr = sus_fr.avg;
+    adcData.sus_bl = sus_bl.avg;
+    adcData.sus_br = sus_br.avg;
 
-    currentData.throttle_pos = throttle_pos.avg;
-    currentData.apps2 =  apps2.avg;
+    adcData.throttle_pos = throttle_pos.avg;
+    adcData.apps2 =  apps2.avg;
 
-    currentData.steering_ang = steering_ang.avg;
+    adcData.steering_ang = steering_ang.avg;
 
-    currentData.inlet_temp = inlet_temp.avg;
-    currentData.outlet_temp = outlet_temp.avg;
+    adcData.inlet_temp = inlet_temp.avg;
+    adcData.outlet_temp = outlet_temp.avg;
 
-    currentData.f_brake_press = f_brake_press.avg;
-    currentData.b_brake_press = b_brake_press.avg;
+    adcData.f_brake_press = f_brake_press.avg;
+    adcData.b_brake_press = b_brake_press.avg;
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-    osMessageQueuePut(LogQHandle, &currentData, 0, 0);
+    osMessageQueuePut(ADCLogQHandle, &adcData, 0, osWaitForever);
   }
   /* USER CODE END StartADCTask */
 }
@@ -774,12 +810,17 @@ void StartLoggingTask(void *argument)
 {
   /* USER CODE BEGIN StartLoggingTask */
   UINT bytesWritten;
-  TelemetryData_t rxData;
+  TelemetryData_t ADCData;
+  TelemetryData_t CANData;
   RTC_TimeTypeDef time;
   RTC_DateTypeDef date;
   static char dirName[16];
   static char fileName[32];
   static uint8_t done = 0;
+  uint8_t writeCtr = 0;
+
+  // temporary
+  TelemetryData_t temp;
 
   HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
@@ -805,30 +846,72 @@ void StartLoggingTask(void *argument)
     if (i == 1000) break;
   }
 
-  int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "TIME, SUSPENSION FL, SUSPENSION FR, SUSPENSION BL, SUSPENSION BR, THROTTLE POSITION, APPS2, STEERING ANGLE, INLET TEMPERATURE, OUTLET TEMPERATURE, FRONT BRAKE PRESSURE, BACK BRAKE PRESSURE\n");
+  int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), 
+  "TIME, SUSPENSION FL, SUSPENSION FR, SUSPENSION BL, SUSPENSION BR, THROTTLE POSITION, APPS2, STEERING ANGLE, INLET TEMPERATURE, OUTLET TEMPERATURE, FRONT BRAKE PRESSURE, BACK BRAKE PRESSURE, BMS 1, BMS 2, DTI 1, DTI 2, DTI 3, DTI 4, DTI 5, COOLANT IN, COOLANT OUT, COOLANT FLOW, BRAKE PSI, WHEEL1, WHEEL2, ROTOR1, ROTOR2\n");
   f_write(&LogFile, &sd_write_buffer, len, &bytesWritten);
   /* Infinite loop */
   for(;;)
   {
+    // replace all id's and indices as necessary
+    temp.BMS_1 = Get_Signal(0x6B1, 0);
+    temp.BMS_2 = Get_Signal(0x6B1, 1);
+    temp.DTI_1 = Get_Signal(0x6B1, 0);
+    temp.DTI_2 = Get_Signal(0x6B1, 1);
+    temp.DTI_3 = Get_Signal(0x6B1, 2);
+    temp.DTI_4 = Get_Signal(0x6B1, 3);
+    temp.DTI_5 = Get_Signal(0x6B1, 4);
+    temp.COOL_IN = Get_Signal(0x6B1, 0);
+    temp.COOL_OUT = Get_Signal(0x6B1, 0);
+    temp.COOL_FLOW = Get_Signal(0x6B1, 0);
+    temp.BRAKE_PSI = Get_Signal(0x6B1, 0);
+    temp.WHEEL1 = Get_Signal(0x6B1, 0);
+    temp.WHEEL2 = Get_Signal(0x6B1, 0);
+    temp.ROTOR1 = Get_Signal(0x6B1, 0);
+    temp.ROTOR2 = Get_Signal(0x6B1, 0);
 
-    if (osMessageQueueGet(LogQHandle, &rxData, NULL, osWaitForever) == osOK) {
-      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", 
-      rxData.timestamp,
-      rxData.sus_fl,
-      rxData.sus_fr,
-      rxData.sus_bl,
-      rxData.sus_br,
-      rxData.throttle_pos,
-      rxData.apps2,
-      rxData.steering_ang,
-      rxData.inlet_temp,
-      rxData.outlet_temp,
-      rxData.f_brake_press,
-      rxData.b_brake_press
+    temp.BMS_1.uint32 =  500;
+
+    osMessageQueuePut(CANLogQHandle, &temp, 0, osWaitForever);
+
+    writeCtr++;
+    if (osMessageQueueGet(ADCLogQHandle, &ADCData, NULL, osWaitForever) == osOK && osMessageQueueGet(CANLogQHandle, &CANData, NULL, osWaitForever) == osOK) {
+      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu,%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu", 
+      ADCData.timestamp,
+      ADCData.sus_fl,
+      ADCData.sus_fr,
+      ADCData.sus_bl,
+      ADCData.sus_br,
+      ADCData.throttle_pos,
+      ADCData.apps2,
+      ADCData.steering_ang,
+      ADCData.inlet_temp,
+      ADCData.outlet_temp,
+      ADCData.f_brake_press,
+      ADCData.b_brake_press,
+      CANData.BMS_1.uint32,
+      CANData.BMS_2.uint32,
+      CANData.DTI_1.uint32,
+      CANData.DTI_2.uint32,
+      CANData.DTI_3.uint32,
+      CANData.DTI_4.uint32,
+      CANData.DTI_5.uint32,
+      CANData.COOL_IN.uint32,
+      CANData.COOL_OUT.uint32,
+      CANData.COOL_FLOW.uint32,
+      CANData.BRAKE_PSI.uint32,
+      CANData.WHEEL1.uint32,
+      CANData.WHEEL2.uint32,
+      CANData.ROTOR1.uint32,
+      CANData.ROTOR2.uint32
     );
-      if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK){
-        fRes = f_sync(&LogFile);
+
+      if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK) {
+        if (writeCtr == 50) {
+          fRes = f_sync(&LogFile);
+          writeCtr = 0;
+        }
       }
+
     }
 
     osDelay(1);
