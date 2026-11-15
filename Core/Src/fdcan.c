@@ -136,6 +136,7 @@ void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
+  HAL_FDCAN_Start(&hfdcan1);
  //Interrupt for queue mode
   HAL_FDCAN_ActivateNotification(&hfdcan1,
     FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_ERROR_WARNING | FDCAN_IT_BUS_OFF | FDCAN_IT_TX_COMPLETE,
@@ -188,6 +189,7 @@ void MX_FDCAN2_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN2_Init 2 */
+  HAL_FDCAN_Start(&hfdcan2);
   //Interrupts for FIFO mode
   HAL_FDCAN_ActivateNotification(&hfdcan2,
     FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_ERROR_WARNING | FDCAN_IT_BUS_OFF | FDCAN_IT_TX_FIFO_EMPTY,

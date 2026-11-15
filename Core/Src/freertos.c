@@ -596,10 +596,10 @@ void StartADCTask(void *argument)
 
     //put actual brake light pin
     if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
-      HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
     }
     else{
-      HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
     }
     
     currentData.timestamp = HAL_GetTick();
@@ -906,7 +906,7 @@ void StartTaskGPIO(void *argument)
 
     if ((uxBits & BTN_RTD) !=0) {
       //pin not confirmed
-      if(HAL_GPIO_ReadPin(GPIOE,1)){
+      if(HAL_GPIO_ReadPin(GPIOE,GPIO_PIN_1)){
         osEventFlagsSet(RTDHandle, RTD_BUTT); 
       }
       else{
@@ -951,9 +951,9 @@ void StartRTDSM(void *argument)
     }
     else if(flags & RTD_BUZZ){
       // turn buzzer on for 1 second
-      HAL_GPIO_WritePin(GPIOA,10, GPIO_PIN_SET); //put actual buzzer pin when done implementing
+      HAL_GPIO_WritePin(GPIOA,GPIO_PIN_10, GPIO_PIN_SET); //put actual buzzer pin when done implementing
       osDelay(1000);
-      HAL_GPIO_WritePin(GPIOA,10,GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOA,GPIO_PIN_10,GPIO_PIN_RESET);
       osEventFlagsClear(RTDHandle, RTD_BUZZ);
 
       can_data[3] = 0;
