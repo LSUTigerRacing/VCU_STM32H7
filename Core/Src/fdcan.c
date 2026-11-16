@@ -77,15 +77,17 @@ typedef struct{
   CAN_Decoded_Values *decoded;
 }CAN_Decoded;
 
-static CAN_Decoded CAN_Storage[50];
-static uint8_t fdcan0_busy;
-static uint8_t fdcan1_busy;
+static D1_RAM CAN_Decoded CAN_Storage[50] = {0};
+static D1_RAM uint8_t fdcan0_busy;
+static D1_RAM uint8_t fdcan1_busy;
+static volatile uint32_t tx_dropped;
 
 CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
 CAN_Decoded_Values* Get_Message(uint16_t id);
 void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
 void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc);
 static void Store_Message(CAN_Decoded msg, uint8_t sig_count);
+static void Grab_Message(FDCAN_HandleTypeDef *hfdcan, osMessageQueueId_t que);
 /* USER CODE END 0 */
 
 FDCAN_HandleTypeDef hfdcan1;
@@ -127,8 +129,8 @@ void MX_FDCAN1_Init(void)
   hfdcan1.Init.RxBuffersNbr = 0;
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.TxEventsNbr = 0;
-  hfdcan1.Init.TxBuffersNbr = 2;
-  hfdcan1.Init.TxFifoQueueElmtsNbr = 2;
+  hfdcan1.Init.TxBuffersNbr = 0;
+  hfdcan1.Init.TxFifoQueueElmtsNbr = 16;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_QUEUE_OPERATION;
   hfdcan1.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
@@ -140,7 +142,7 @@ void MX_FDCAN1_Init(void)
  //Interrupt for queue mode
   HAL_FDCAN_ActivateNotification(&hfdcan1,
     FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_ERROR_WARNING | FDCAN_IT_BUS_OFF | FDCAN_IT_TX_COMPLETE,
-    0);
+    0xFFFFFFFF);
 
   /* USER CODE END FDCAN1_Init 2 */
 
@@ -180,8 +182,8 @@ void MX_FDCAN2_Init(void)
   hfdcan2.Init.RxBuffersNbr = 0;
   hfdcan2.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
   hfdcan2.Init.TxEventsNbr = 0;
-  hfdcan2.Init.TxBuffersNbr = 32;
-  hfdcan2.Init.TxFifoQueueElmtsNbr = 0;
+  hfdcan2.Init.TxBuffersNbr = 0;
+  hfdcan2.Init.TxFifoQueueElmtsNbr = 16;
   hfdcan2.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   hfdcan2.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
   if (HAL_FDCAN_Init(&hfdcan2) != HAL_OK)
@@ -192,8 +194,8 @@ void MX_FDCAN2_Init(void)
   HAL_FDCAN_Start(&hfdcan2);
   //Interrupts for FIFO mode
   HAL_FDCAN_ActivateNotification(&hfdcan2,
-    FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_ERROR_WARNING | FDCAN_IT_BUS_OFF | FDCAN_IT_TX_FIFO_EMPTY,
-    0);
+    FDCAN_IT_RX_FIFO0_NEW_MESSAGE | FDCAN_IT_ERROR_WARNING | FDCAN_IT_BUS_OFF | FDCAN_IT_TX_COMPLETE,
+    0xFFFFFFFF);
   /* USER CODE END FDCAN2_Init 2 */
 
 }
@@ -449,30 +451,67 @@ void HAL_FDCAN_MspDeInit(FDCAN_HandleTypeDef* fdcanHandle)
 
 /* USER CODE BEGIN 1 */
 
+/// @brief Grabs a message from the desired software queue and puts it inside the hardware queue
+/// @param hfdcan CAN handler pointer
+/// @param que Software queue id
+static void Grab_Message(FDCAN_HandleTypeDef *hfdcan, osMessageQueueId_t que){
+  CAN_Msg_Raw msg = {0};
+  FDCAN_TxHeaderTypeDef header = {
+    .IdType = FDCAN_STANDARD_ID,
+    .TxFrameType = FDCAN_DATA_FRAME,
+    .ErrorStateIndicator = FDCAN_ESI_ACTIVE,
+    .BitRateSwitch = FDCAN_BRS_OFF,
+    .FDFormat = FDCAN_CLASSIC_CAN,
+    .TxEventFifoControl = FDCAN_NO_TX_EVENTS,
+  };
+
+  while(HAL_FDCAN_GetTxFifoFreeLevel(hfdcan) > 0 && osMessageQueueGet(que, &msg, NULL, 0) == osOK){
+    header.Identifier = msg.id;
+    header.DataLength = msg.dlc;
+    if(HAL_FDCAN_AddMessageToTxFifoQ(hfdcan, &header, msg.data)){
+        tx_dropped++;
+    }
+  }
+}
+
 /// @brief Preparing a message that is about to be sent
 /// @param hfdcan CAN handler pointer
 /// @param id CAN id
 /// @param data CAN data
 /// @param dlc Data length code
 void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc){
-  CAN_Msg_Raw ret;
+  CAN_Msg_Raw msg = {0};
+  osMessageQueueId_t que;  osMutexId_t mut;  IRQn_Type irq;
+  msg.id = id;
+  msg.dlc = dlc;
 
-  ret.id = id;
-  ret.dlc = dlc;
-
-  for(uint8_t i = 0; i < 8; i++){
-    ret.data[i] = data[i];
+  if(dlc > 8){
+    msg.dlc = 8;
   }
+
+  for(uint8_t i = 0; i < dlc; i++){
+    msg.data[i] = data[i];
+  }
+
   if(hfdcan->Instance == FDCAN1){
-    osSemaphoreAcquire(CAN1txSHandle, 0);
-    osMessageQueuePut(CAN1txQHandle, &ret, 0, 0);
-    osSemaphoreRelease(CAN1txSHandle);
+    que = CAN1txQHandle;
+    mut = CAN1txMHandle;
+    irq = FDCAN1_IT0_IRQn;
   }
   else if(hfdcan->Instance == FDCAN2){
-    osSemaphoreAcquire(CAN2txSHandle, 0);
-    osMessageQueuePut(CAN2txQHandle, &ret, 0, 0);
-    osSemaphoreRelease(CAN2txSHandle);
+    que = CAN2txQHandle;
+    mut = CAN2txMHandle;
+    irq= FDCAN2_IT0_IRQn;
   }
+
+  osMutexAcquire(mut,osWaitForever);
+  if(osMessageQueuePut(que,&msg,0,0) != osOK){
+      tx_dropped++;
+  }
+  HAL_NVIC_DisableIRQ(irq);
+  Grab_Message(hfdcan,que);
+  HAL_NVIC_EnableIRQ(irq);
+  osMutexRelease(mut);
 }
 
 /// @brief Stores decoded CAN message in CAN_Storage array
@@ -664,71 +703,19 @@ CAN_Decoded_Values* Get_Message(uint16_t id){
   return ret;
 }
 
-/// @brief Used for CAN1 bus transmissions with queue mode 
+/// @brief Used for CAN1 bus transmissions with queue mode when there is open space 
+//  in the controller
 /// @param hfdcan Pointer to CAN instance
 /// @param BufferIndexes Buffers that have completed their transmission
 void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes){
-  HAL_StatusTypeDef status;
-  FDCAN_TxHeaderTypeDef header;
-  CAN_Msg_Raw raw_msg;
-
-  osMessageQueueGet(CAN1txQHandle, &raw_msg, 0, 0);
-
-  header.Identifier = raw_msg.id;
-  header.TxFrameType = FDCAN_DATA_FRAME;
-  header.DataLength = raw_msg.dlc;
-  header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-  header.BitRateSwitch       = FDCAN_BRS_OFF;       // OFF if you're not using CAN FD bit-rate switching
-  header.FDFormat            = FDCAN_CLASSIC_CAN;
-  header.TxEventFifoControl  = FDCAN_NO_TX_EVENTS;  // unless you're using the Tx event FIFO
-  header.MessageMarker       = 0;
-
-  osSemaphoreAcquire(CAN1txSHandle, 0);
-  status = HAL_FDCAN_AddMessageToTxFifoQ(hfdcan,&header, raw_msg.data);
-  osSemaphoreRelease(CAN1txSHandle);
-  switch(status){
-    case HAL_OK:
-    break;
-
-    case HAL_BUSY:
-
-    default:
-    Error_Handler();
-    break;
+  if(hfdcan->Instance == FDCAN1){
+    Grab_Message(hfdcan,CAN1txQHandle);
+  }
+  else if(hfdcan->Instance == FDCAN2){
+    Grab_Message(hfdcan,CAN2txQHandle);
   }
 }
 
-/// @brief Adds messages to CAN2 FIFO
-/// @param hfdcan pointer to can
-void HAL_FDCAN_TxFifoEmptyCallback(FDCAN_HandleTypeDef *hfdcan){
-  HAL_StatusTypeDef status;
-  FDCAN_TxHeaderTypeDef header;
-  CAN_Msg_Raw raw_msg;
-  osMessageQueueGet(CAN2txQHandle, &raw_msg, 0, 0);
-  
-  header.Identifier = raw_msg.id;
-  header.TxFrameType = FDCAN_DATA_FRAME;
-  header.DataLength = raw_msg.dlc;
-  header.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-  header.BitRateSwitch       = FDCAN_BRS_OFF;       // OFF if you're not using CAN FD bit-rate switching
-  header.FDFormat            = FDCAN_CLASSIC_CAN;
-  header.TxEventFifoControl  = FDCAN_NO_TX_EVENTS;  // unless you're using the Tx event FIFO
-  header.MessageMarker       = 0;    
-
-  status = HAL_FDCAN_AddMessageToTxFifoQ(hfdcan,&header, raw_msg.data);
-
-  switch(status){
-    case HAL_OK:
-    
-    break;
-
-    case HAL_BUSY:
-
-    default:
-    Error_Handler();
-    break;
-  }
-}
 
 /// @brief Handles recieve for CAN RxFifo0 buffer
 /// @param hfdcan Pointer for CAN peripheral

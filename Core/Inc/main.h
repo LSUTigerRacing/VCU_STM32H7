@@ -88,6 +88,14 @@ void Error_Handler(void);
 #define THROTTLE_PEDAL_POSITION_GPIO_Port GPIOB
 #define SUSPENSION_BL_Pin GPIO_PIN_1
 #define SUSPENSION_BL_GPIO_Port GPIOB
+#define DigOut_9_Pin GPIO_PIN_8
+#define DigOut_9_GPIO_Port GPIOD
+#define DigOut_8_Pin GPIO_PIN_9
+#define DigOut_8_GPIO_Port GPIOD
+#define DigOut_7_Pin GPIO_PIN_10
+#define DigOut_7_GPIO_Port GPIOD
+#define DigOut_6_Pin GPIO_PIN_11
+#define DigOut_6_GPIO_Port GPIOD
 #define SD_Detect_Pin GPIO_PIN_14
 #define SD_Detect_GPIO_Port GPIOD
 #define DigOut_5_Pin GPIO_PIN_15
@@ -130,6 +138,10 @@ void Error_Handler(void);
 #define BIT5 (1ULL << 5)
 #define BIT6 (1ULL << 6)
 #define BIT7 (1ULL << 7)
+
+#define D1_RAM __attribute__((section(".D1_RAM")))
+#define D2_RAM __attribute__((section(".D2_RAM")))
+#define D3_RAM __attribute__((section(".D3_RAM")))
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

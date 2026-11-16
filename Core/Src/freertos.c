@@ -78,6 +78,7 @@ typedef struct {
 #define RTD_ON                BIT0
 #define RTD_BUZZ              BIT1
 #define RTD_BUTT              BIT2
+#define RTD_FAULT             BIT3
 #define MC_MAX_OUTPUT         500
 /* USER CODE END PM */
 
@@ -106,7 +107,7 @@ typedef enum{
 static volatile Powermodes power;
 
 //sigmoid function
-static uint16_t throttle_curve[11] = {
+static const uint16_t throttle_curve[11] = {
 0, 302, 519, 707, 881, 1050, 1219, 1393, 1581, 1798, 2100
 };
 
@@ -568,25 +569,34 @@ void StartADCTask(void *argument)
     throttle_pos.avg = (throttle_pos.data1 + throttle_pos.data2) / 2;
     apps2.avg = apps2.data1;
 
-    if(throttle_pos.avg >= throttle_curve[10]){
-      perc = 100;
-    }
-    else if(throttle_pos.avg <= throttle_curve[0]){
-      perc = 0;
-    }
-    else{
-      for(uint8_t i = 1; i < 10; i++){
-        if(throttle_pos.avg <= throttle_curve[i]){
-          //left side of the equation finds the tens position of the percentage while the right finds the ones position
-          perc = ((i - 1) * 10) + ((throttle_pos.avg - throttle_curve[i-1]) / (throttle_curve[i] - throttle_curve[i-1])); 
+  //APPS check
+  uint32_t high = (throttle_pos.avg > apps2.avg) ? throttle_pos.data1 : apps2.avg;
+  uint32_t low = (throttle_pos.avg > apps2.avg) ? apps2.avg : throttle_pos.avg;
+  uint64_t diff= high - low;
+    if(osEventFlagsGet(RTDHandle) & RTD_ON && !(diff * 10 > high)){
+      if(throttle_pos.avg >= throttle_curve[10]){
+        perc = 100;
+      }
+      else if(throttle_pos.avg <= throttle_curve[0]){
+        perc = 0;
+      }
+      else{
+        for(uint8_t i = 1; i < 10; i++){
+          if(throttle_pos.avg <= throttle_curve[i]){
+            //left side of the equation finds the tens position of the percentage while the right finds the ones position
+            perc = ((i - 1) * 10) + ((throttle_pos.avg - throttle_curve[i-1]) / (throttle_curve[i] - throttle_curve[i-1])); 
+          }
         }
       }
-    }
-    perc *= 10;
-    can_data[0] = (uint8_t) (perc & 0xFF);
-    can_data[1] = (uint8_t) ((perc >> 8) & 0xFF);
+      perc *= 10;
+      can_data[0] = (uint8_t) (perc & 0xFF);
+      can_data[1] = (uint8_t) ((perc >> 8) & 0xFF);
 
-    Prepare_Message(&hfdcan1, 0x05, can_data, 2); //for relative output current (find real id)
+      Prepare_Message(&hfdcan1, 0x05, can_data, 2); //for relative output current (find real id)
+  }
+  else{
+    osEventFlagsSet(RTDHandle, RTD_FAULT);
+  }
 
     inlet_temp.avg = (inlet_temp.data1 + inlet_temp.data2) / 2;
     outlet_temp.avg = (outlet_temp.data1 + outlet_temp.data2) / 2;
@@ -594,12 +604,17 @@ void StartADCTask(void *argument)
     f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
     b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
 
+  //BSPD check
+  if(throttle_pos.avg>= HARD_ACCEL && b_brake_press.avg>= HARD_BRAKE){
+    osEventFlagsSet(RTDHandle, RTD_FAULT);
+  }
+
     //put actual brake light pin
     if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(GPIOA, DigOut_3_Pin, GPIO_PIN_SET);
     }
     else{
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_8, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOA, DigOut_3_Pin, GPIO_PIN_RESET);
     }
     
     currentData.timestamp = HAL_GetTick();
@@ -942,18 +957,19 @@ void StartRTDSM(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osEventFlagsWait(RTDHandle,RTD_ON | RTD_BUZZ, osFlagsWaitAny, osWaitForever);
+    osEventFlagsWait(RTDHandle, RTD_BUZZ | RTD_FAULT, osFlagsWaitAny, osWaitForever);
     flags = osEventFlagsGet(RTDHandle);
-    if(!(flags & RTD_ON)){
-      //CAN message to turn on motor controller
-      can_data[3] = 1;
+    if(flags & RTD_FAULT){
+      //CAN id for drive enable
+      can_data[3] = 1; //turn off motor controller
       Prepare_Message(&hfdcan1,0x24,can_data,8); 
+      osEventFlagsClear(RTDHandle, RTD_ON);
     }
     else if(flags & RTD_BUZZ){
       // turn buzzer on for 1 second
-      HAL_GPIO_WritePin(GPIOA,GPIO_PIN_10, GPIO_PIN_SET); //put actual buzzer pin when done implementing
+      HAL_GPIO_WritePin(GPIOA,DigOut_1_Pin, GPIO_PIN_SET); //put actual buzzer pin when done implementing
       osDelay(1000);
-      HAL_GPIO_WritePin(GPIOA,GPIO_PIN_10,GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOA,DigOut_1_Pin,GPIO_PIN_RESET);
       osEventFlagsClear(RTDHandle, RTD_BUZZ);
 
       can_data[3] = 0;

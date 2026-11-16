@@ -30,6 +30,7 @@ extern osEventFlagsId_t RTDHandle;
 /* BEGIN Defines*/
 #define RTD_ON     BIT0
 #define RTD_BUZZER BIT1
+#define RTD_FAULT  BIT3
 /* END Defines*/
 
 /* BEGIN Globals*/
@@ -98,18 +99,18 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     apps2.data2 = apps2.data1;
   }
 
-  //BSPD check
-  if( (throttle_pos.data1 + throttle_pos.data2)>= HARD_ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
-    osEventFlagsClear(RTDHandle, RTD_ON);
-  }
+  // //BSPD check
+  // if( (throttle_pos.data1 + throttle_pos.data2)>= HARD_ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
+  //   osEventFlagsSet(RTDHandle, RTD_FAULT);
+  // }
 
-  //APPS check
-  uint32_t high = (apps2.data1 > app2.data1) ? throttle_pos.data1 : app2.data1;
-  uint32_t low = (throttle_pos.data1 > app2.data1) ? app2.data1 : throttle_pos.data1;
-  uint64_t diff= high - low;
-  if(diff * 10 > high){
-    osEventFlagsClear(RTDHandle,RTD_ON);
-  }
+  // //APPS check
+  // uint32_t high = (apps2.data1 > app2.data1) ? throttle_pos.data1 : app2.data1;
+  // uint32_t low = (throttle_pos.data1 > app2.data1) ? app2.data1 : throttle_pos.data1;
+  // uint64_t diff= high - low;
+  // if(diff * 10 > high){
+  //   osEventFlagsSet(RTDHandle,RTD_FAULT);
+  // }
 
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   vTaskNotifyGiveFromISR(ADCTaskHandle, &xHigherPriorityTaskWoken);
