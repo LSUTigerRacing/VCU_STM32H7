@@ -131,17 +131,16 @@ int main(void)
   MX_FATFS_Init();
   MX_RTC_Init();
   MX_OCTOSPI1_Init();
-  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
   //startup info
 
   //Lamp check (E.V. 6.3) page 101
-  HAL_GPIO_WritePin(GPIOA, 9, GPIO_PIN_SET); //Highside driver for the lights
+  HAL_GPIO_WritePin(GPIOA, DigOut_2_Pin, GPIO_PIN_SET); //Highside driver for the lights
   HAL_Delay(2500);
-  HAL_GPIO_WritePin(GPIOA, 9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, DigOut_2_Pin, GPIO_PIN_RESET);
 
-  HAL_GPIO_WritePin(GPIOE, 1, GPIO_PIN_SET); //Power for fault latch
+  HAL_GPIO_WritePin(GPIOC, DigOut_4_Pin, GPIO_PIN_SET); //Power for fault latch
   HAL_Delay(5000); //wait for 5 seconds
 
   //get bms_fault

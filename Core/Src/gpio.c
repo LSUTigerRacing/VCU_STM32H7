@@ -53,7 +53,8 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, DigOut_5_Pin|DigIn_10_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOD, DigOut_9_Pin|DigOut_8_Pin|DigOut_7_Pin|DigOut_6_Pin
+                          |DigOut_5_Pin|DigIn_10_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(DigOut_4_GPIO_Port, DigOut_4_Pin, GPIO_PIN_RESET);
@@ -67,17 +68,19 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : DigOut_9_Pin DigOut_8_Pin DigOut_7_Pin DigOut_6_Pin
+                           DigOut_5_Pin DigIn_10_Pin */
+  GPIO_InitStruct.Pin = DigOut_9_Pin|DigOut_8_Pin|DigOut_7_Pin|DigOut_6_Pin
+                          |DigOut_5_Pin|DigIn_10_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
   /*Configure GPIO pins : SD_Detect_Pin DigIn_12_Pin DigIn_8_Pin */
   GPIO_InitStruct.Pin = SD_Detect_Pin|DigIn_12_Pin|DigIn_8_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : DigOut_5_Pin DigIn_10_Pin */
-  GPIO_InitStruct.Pin = DigOut_5_Pin|DigIn_10_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /*Configure GPIO pin : DigOut_4_Pin */
