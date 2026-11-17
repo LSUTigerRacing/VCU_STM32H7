@@ -241,6 +241,18 @@ const osThreadAttr_t RTDOn_attributes = {
   .stack_size = sizeof(RTDOnBuffer),
   .priority = (osPriority_t) osPriorityRealtime5,
 };
+/* Definitions for TelemLog */
+osThreadId_t TelemLogHandle;
+uint32_t TelemLogBuffer[ 256 ];
+osStaticThreadDef_t TelemLogControlBlock;
+const osThreadAttr_t TelemLog_attributes = {
+  .name = "TelemLog",
+  .cb_mem = &TelemLogControlBlock,
+  .cb_size = sizeof(TelemLogControlBlock),
+  .stack_mem = &TelemLogBuffer[0],
+  .stack_size = sizeof(TelemLogBuffer),
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
 uint8_t CAN1rxQBuffer[ 16 * sizeof( CAN_Msg_Raw ) ];
@@ -296,6 +308,17 @@ const osMessageQueueAttr_t LogQ_attributes = {
   .mq_mem = &LogQBuffer,
   .mq_size = sizeof(LogQBuffer)
 };
+/* Definitions for TelemQ */
+osMessageQueueId_t TelemQHandle;
+uint8_t TelemQBuffer[ 16 * sizeof( TelemStamp ) ];
+osStaticMessageQDef_t TelemQControlBlock;
+const osMessageQueueAttr_t TelemQ_attributes = {
+  .name = "TelemQ",
+  .cb_mem = &TelemQControlBlock,
+  .cb_size = sizeof(TelemQControlBlock),
+  .mq_mem = &TelemQBuffer,
+  .mq_size = sizeof(TelemQBuffer)
+};
 /* Definitions for CAN1txM */
 osMutexId_t CAN1txMHandle;
 osStaticMutexDef_t CAN1txMControlBlock;
@@ -304,14 +327,6 @@ const osMutexAttr_t CAN1txM_attributes = {
   .cb_mem = &CAN1txMControlBlock,
   .cb_size = sizeof(CAN1txMControlBlock),
 };
-/* Definitions for CAN1rxM */
-osMutexId_t CAN1rxMHandle;
-osStaticMutexDef_t CAN1rxMControlBlock;
-const osMutexAttr_t CAN1rxM_attributes = {
-  .name = "CAN1rxM",
-  .cb_mem = &CAN1rxMControlBlock,
-  .cb_size = sizeof(CAN1rxMControlBlock),
-};
 /* Definitions for CAN2txM */
 osMutexId_t CAN2txMHandle;
 osStaticMutexDef_t CAN2txMControlBlock;
@@ -319,14 +334,6 @@ const osMutexAttr_t CAN2txM_attributes = {
   .name = "CAN2txM",
   .cb_mem = &CAN2txMControlBlock,
   .cb_size = sizeof(CAN2txMControlBlock),
-};
-/* Definitions for CAN2rxM */
-osMutexId_t CAN2rxMHandle;
-osStaticMutexDef_t CAN2rxMControlBlock;
-const osMutexAttr_t CAN2rxM_attributes = {
-  .name = "CAN2rxM",
-  .cb_mem = &CAN2rxMControlBlock,
-  .cb_size = sizeof(CAN2rxMControlBlock),
 };
 /* Definitions for CAN1rxS */
 osSemaphoreId_t CAN1rxSHandle;
@@ -393,6 +400,7 @@ void StartLoggingTask(void *argument);
 void StartTaskGPIO(void *argument);
 void StartRTDSM(void *argument);
 void StartRTDOn(void *argument);
+void StartTelemLog(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -409,14 +417,8 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN1txM */
   CAN1txMHandle = osMutexNew(&CAN1txM_attributes);
 
-  /* creation of CAN1rxM */
-  CAN1rxMHandle = osMutexNew(&CAN1rxM_attributes);
-
   /* creation of CAN2txM */
   CAN2txMHandle = osMutexNew(&CAN2txM_attributes);
-
-  /* creation of CAN2rxM */
-  CAN2rxMHandle = osMutexNew(&CAN2rxM_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -460,6 +462,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of LogQ */
   LogQHandle = osMessageQueueNew (512, sizeof(TelemetryData_t), &LogQ_attributes);
 
+  /* creation of TelemQ */
+  TelemQHandle = osMessageQueueNew (16, sizeof(TelemStamp), &TelemQ_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -497,6 +502,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of RTDOn */
   RTDOnHandle = osThreadNew(StartRTDOn, NULL, &RTDOn_attributes);
+
+  /* creation of TelemLog */
+  TelemLogHandle = osThreadNew(StartTelemLog, NULL, &TelemLog_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -1003,6 +1011,24 @@ void StartRTDOn(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartRTDOn */
+}
+
+/* USER CODE BEGIN Header_StartTelemLog */
+/**
+* @brief Function implementing the TelemLog thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTelemLog */
+void StartTelemLog(void *argument)
+{
+  /* USER CODE BEGIN StartTelemLog */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTelemLog */
 }
 
 /* Private application code --------------------------------------------------*/

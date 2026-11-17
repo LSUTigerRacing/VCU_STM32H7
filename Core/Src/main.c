@@ -26,6 +26,7 @@
 #include "dma.h"
 #include "fatfs.h"
 #include "fdcan.h"
+#include "lptim.h"
 #include "mdma.h"
 #include "octospi.h"
 #include "ramecc.h"
@@ -117,7 +118,6 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM4_Init();
-  MX_TIM5_Init();
   MX_TIM15_Init();
   MX_RAMECC_Init();
   MX_USART2_UART_Init();
@@ -131,6 +131,10 @@ int main(void)
   MX_FATFS_Init();
   MX_RTC_Init();
   MX_OCTOSPI1_Init();
+  MX_LPTIM3_Init();
+  MX_TIM7_Init();
+  MX_TIM23_Init();
+  MX_TIM24_Init();
   /* USER CODE BEGIN 2 */
 
   //startup info
