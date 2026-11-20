@@ -318,17 +318,6 @@ const osMessageQueueAttr_t CAN2txQ_attributes = {
   .mq_mem = &CAN2txQBuffer,
   .mq_size = sizeof(CAN2txQBuffer)
 };
-/* Definitions for LogQ */
-osMessageQueueId_t LogQHandle;
-uint8_t LogQBuffer[ 512 * sizeof( TelemetryData_t ) ];
-osStaticMessageQDef_t LogQControlBlock;
-const osMessageQueueAttr_t LogQ_attributes = {
-  .name = "LogQ",
-  .cb_mem = &LogQControlBlock,
-  .cb_size = sizeof(LogQControlBlock),
-  .mq_mem = &LogQBuffer,
-  .mq_size = sizeof(LogQBuffer)
-};
 /* Definitions for ADCLogQ */
 osMessageQueueId_t ADCLogQHandle;
 uint8_t ADCLogQBuffer[ 64 * sizeof( TelemetryData_t ) ];
@@ -491,9 +480,7 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN2txQ */
   CAN2txQHandle = osMessageQueueNew (16, sizeof(CAN_Msg_Raw), &CAN2txQ_attributes);
 
-  /* creation of LogQ */
-  LogQHandle = osMessageQueueNew (512, sizeof(TelemetryData_t), &LogQ_attributes);
-
+ 
   /* creation of ADCLogQ */
   ADCLogQHandle = osMessageQueueNew (64, sizeof(TelemetryData_t), &ADCLogQ_attributes);
 

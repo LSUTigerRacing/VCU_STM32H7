@@ -25,7 +25,7 @@
 #define WS_TEETH      20
 #define WS_TIMEOUT_MS 655
 #define TIM_TICK_HZ   1000000.0f   // 240 MHz / 240
-
+#define FLOW_K        7.5f
 typedef struct {
     uint32_t channel;
     HAL_TIM_ActiveChannel active;
@@ -46,10 +46,14 @@ WheelSpeed ws[4] = {
     { TIM_CHANNEL_4, HAL_TIM_ACTIVE_CHANNEL_4 },  // RR PB9
 };
 
+static float flow_lpm;
+
 static PWM PWM_Read(TIM_HandleTypeDef *htim, uint32_t ch_period, uint32_t ch_high);
 float Traction_Control();
 
 static PWM PWM_Read(TIM_HandleTypeDef *htim, uint32_t ch_period, uint32_t ch_high);
+
+float Read_Flowrate();
 /* USER CODE END 0 */
 
 TIM_HandleTypeDef htim1;
@@ -1116,6 +1120,7 @@ float Traction_Control(){
     speed[i] = TIM_TICK_HZ * 60.0f / ((float)ws[i].period * WS_TEETH);
   }
   vech_speed = (speed[0] + speed[1]) / 2;
+  //gets the slip from both rear wheels and averages them
   avg_slip = (((speed[2] - vech_speed) / vech_speed) + ((speed[3] - vech_speed) / vech_speed)) / 2;
   //sees if there is over 15% slip on the rear wheels on average 
   if(avg_slip >= .15){
@@ -1142,6 +1147,21 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
         w->last_cap = cap;
         w->last_ms  = now;
     }
+}
+
+float Read_Flowrate(){
+  uint32_t sr = htim5.Instance->SR;
+  float lpm;
+
+  if (sr & TIM_FLAG_UPDATE) {                   // 2 s with no pulse
+      __HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE | TIM_FLAG_CC1);
+       flow_lpm = 0.0f;
+  } else if (sr & TIM_FLAG_CC1) {               // new pulse captured
+      uint32_t period = HAL_TIM_ReadCapturedValue(&htim5, TIM_CHANNEL_1) + 1;
+      lpm = (TIM_TICK_HZ / period) / FLOW_K;
+      flow_lpm += 0.2f * (lpm - flow_lpm);      // smooth turbine jitter
+    }
+    return flow_lpm;
 }
 /* USER CODE END 1 */
 

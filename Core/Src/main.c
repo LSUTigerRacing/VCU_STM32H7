@@ -159,7 +159,10 @@ int main(void)
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2); //fr ws
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_3); //rl ws
   HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_4); //rr ws
-  HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_1); //flowrate
+  //flowrate timer
+  __HAL_TIM_URS_ENABLE(&htim5);                 
+  __HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE);
+  HAL_TIM_IC_Start(&htim5, TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Init scheduler */
