@@ -491,7 +491,6 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     /**ADC1 GPIO Configuration
     PC1     ------> ADC1_INP11
-    PA1     ------> ADC1_INP17
     PA2     ------> ADC1_INP14
     PA3     ------> ADC1_INP15
     PA5     ------> ADC1_INP19
@@ -507,8 +506,8 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_1|OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin
-                          |SUSPENSION_FL_Pin|SUSPENSION_BR_Pin;
+    GPIO_InitStruct.Pin = OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin|SUSPENSION_FL_Pin
+                          |SUSPENSION_BR_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -678,7 +677,6 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 
     /**ADC1 GPIO Configuration
     PC1     ------> ADC1_INP11
-    PA1     ------> ADC1_INP17
     PA2     ------> ADC1_INP14
     PA3     ------> ADC1_INP15
     PA5     ------> ADC1_INP19
@@ -691,8 +689,8 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
     */
     HAL_GPIO_DeInit(GPIOC, INLET_TEMPERATURE_Pin|SUSPENSION_FR_Pin|STEERING_ANGLE_Pin);
 
-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_1|OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin
-                          |SUSPENSION_FL_Pin|SUSPENSION_BR_Pin);
+    HAL_GPIO_DeInit(GPIOA, OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin|SUSPENSION_FL_Pin
+                          |SUSPENSION_BR_Pin);
 
     HAL_GPIO_DeInit(GPIOB, THROTTLE_PEDAL_POSITION_Pin|SUSPENSION_BL_Pin);
 

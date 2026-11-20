@@ -64,12 +64,16 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define DigIn_3_Pin GPIO_PIN_2
+#define DigIn_3_GPIO_Port GPIOE
+#define DigIn_4_Pin GPIO_PIN_3
+#define DigIn_4_GPIO_Port GPIOE
+#define DigIn_5_Pin GPIO_PIN_4
+#define DigIn_5_GPIO_Port GPIOE
 #define INLET_TEMPERATURE_Pin GPIO_PIN_1
 #define INLET_TEMPERATURE_GPIO_Port GPIOC
 #define APPS2_Pin GPIO_PIN_2
 #define APPS2_GPIO_Port GPIOC
-#define WATER_PUMP_Pin GPIO_PIN_0
-#define WATER_PUMP_GPIO_Port GPIOA
 #define OUTLET_TEMPERATURE_Pin GPIO_PIN_2
 #define OUTLET_TEMPERATURE_GPIO_Port GPIOA
 #define FRONT_BRAKE_PRESSURE_Pin GPIO_PIN_3
@@ -88,12 +92,10 @@ void Error_Handler(void);
 #define THROTTLE_PEDAL_POSITION_GPIO_Port GPIOB
 #define SUSPENSION_BL_Pin GPIO_PIN_1
 #define SUSPENSION_BL_GPIO_Port GPIOB
-#define DigOut_9_Pin GPIO_PIN_8
-#define DigOut_9_GPIO_Port GPIOD
-#define DigOut_8_Pin GPIO_PIN_9
-#define DigOut_8_GPIO_Port GPIOD
-#define DigOut_7_Pin GPIO_PIN_10
-#define DigOut_7_GPIO_Port GPIOD
+#define FR_WS_Pin GPIO_PIN_14
+#define FR_WS_GPIO_Port GPIOB
+#define FL_WS_Pin GPIO_PIN_15
+#define FL_WS_GPIO_Port GPIOB
 #define DigOut_6_Pin GPIO_PIN_11
 #define DigOut_6_GPIO_Port GPIOD
 #define SD_Detect_Pin GPIO_PIN_14
@@ -102,6 +104,8 @@ void Error_Handler(void);
 #define DigOut_5_GPIO_Port GPIOD
 #define DigOut_4_Pin GPIO_PIN_6
 #define DigOut_4_GPIO_Port GPIOC
+#define RR_WS_Pin GPIO_PIN_7
+#define RR_WS_GPIO_Port GPIOC
 #define DigOut_3_Pin GPIO_PIN_8
 #define DigOut_3_GPIO_Port GPIOA
 #define DigOut_2_Pin GPIO_PIN_9
@@ -116,18 +120,18 @@ void Error_Handler(void);
 #define DigIn_8_GPIO_Port GPIOD
 #define DigIn_7_Pin GPIO_PIN_5
 #define DigIn_7_GPIO_Port GPIOB
-#define DigIn_6_Pin GPIO_PIN_6
-#define DigIn_6_GPIO_Port GPIOB
-#define DigIn_5_Pin GPIO_PIN_7
-#define DigIn_5_GPIO_Port GPIOB
-#define DigIn_4_Pin GPIO_PIN_8
-#define DigIn_4_GPIO_Port GPIOB
-#define DigIn_3_Pin GPIO_PIN_9
-#define DigIn_3_GPIO_Port GPIOB
-#define DigIn_2_Pin GPIO_PIN_0
-#define DigIn_2_GPIO_Port GPIOE
-#define DigIn_1_Pin GPIO_PIN_1
+#define FL_WSB6_Pin GPIO_PIN_6
+#define FL_WSB6_GPIO_Port GPIOB
+#define FR_WSB7_Pin GPIO_PIN_7
+#define FR_WSB7_GPIO_Port GPIOB
+#define RL_WS_Pin GPIO_PIN_8
+#define RL_WS_GPIO_Port GPIOB
+#define RR_WSB9_Pin GPIO_PIN_9
+#define RR_WSB9_GPIO_Port GPIOB
+#define DigIn_1_Pin GPIO_PIN_0
 #define DigIn_1_GPIO_Port GPIOE
+#define DigIn_2_Pin GPIO_PIN_1
+#define DigIn_2_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
 #define BIT0 (1ULL << 0)
