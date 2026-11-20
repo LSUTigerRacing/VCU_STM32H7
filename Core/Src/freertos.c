@@ -329,16 +329,27 @@ const osMessageQueueAttr_t LogQ_attributes = {
   .mq_mem = &LogQBuffer,
   .mq_size = sizeof(LogQBuffer)
 };
-/* Definitions for TelemQ */
-osMessageQueueId_t TelemQHandle;
-uint8_t TelemQBuffer[ 16 * sizeof( TelemStamp ) ];
-osStaticMessageQDef_t TelemQControlBlock;
-const osMessageQueueAttr_t TelemQ_attributes = {
-  .name = "TelemQ",
-  .cb_mem = &TelemQControlBlock,
-  .cb_size = sizeof(TelemQControlBlock),
-  .mq_mem = &TelemQBuffer,
-  .mq_size = sizeof(TelemQBuffer)
+/* Definitions for ADCLogQ */
+osMessageQueueId_t ADCLogQHandle;
+uint8_t ADCLogQBuffer[ 64 * sizeof( TelemetryData_t ) ];
+osStaticMessageQDef_t ADCLogQControlBlock;
+const osMessageQueueAttr_t ADCLogQ_attributes = {
+  .name = "ADCLogQ",
+  .cb_mem = &ADCLogQControlBlock,
+  .cb_size = sizeof(ADCLogQControlBlock),
+  .mq_mem = &ADCLogQBuffer,
+  .mq_size = sizeof(ADCLogQBuffer)
+};
+/* Definitions for CANLogQ */
+osMessageQueueId_t CANLogQHandle;
+uint8_t CANLogQBuffer[ 16 * sizeof( TelemetryData_t ) ];
+osStaticMessageQDef_t CANLogQControlBlock;
+const osMessageQueueAttr_t CANLogQ_attributes = {
+  .name = "CANLogQ",
+  .cb_mem = &CANLogQControlBlock,
+  .cb_size = sizeof(CANLogQControlBlock),
+  .mq_mem = &CANLogQBuffer,
+  .mq_size = sizeof(CANLogQBuffer)
 };
 /* Definitions for CAN1txM */
 osMutexId_t CAN1txMHandle;
@@ -483,8 +494,11 @@ void MX_FREERTOS_Init(void) {
   /* creation of LogQ */
   LogQHandle = osMessageQueueNew (512, sizeof(TelemetryData_t), &LogQ_attributes);
 
-  /* creation of TelemQ */
-  TelemQHandle = osMessageQueueNew (16, sizeof(TelemStamp), &TelemQ_attributes);
+  /* creation of ADCLogQ */
+  ADCLogQHandle = osMessageQueueNew (64, sizeof(TelemetryData_t), &ADCLogQ_attributes);
+
+  /* creation of CANLogQ */
+  CANLogQHandle = osMessageQueueNew (16, sizeof(TelemetryData_t), &CANLogQ_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
