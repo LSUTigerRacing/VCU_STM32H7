@@ -132,7 +132,6 @@ int main(void)
   MX_TIM23_Init();
   MX_TIM24_Init();
   MX_TIM5_Init();
-  MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
 
   //startup info

@@ -480,7 +480,6 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN2txQ */
   CAN2txQHandle = osMessageQueueNew (16, sizeof(CAN_Msg_Raw), &CAN2txQ_attributes);
 
- 
   /* creation of ADCLogQ */
   ADCLogQHandle = osMessageQueueNew (64, sizeof(TelemetryData_t), &ADCLogQ_attributes);
 

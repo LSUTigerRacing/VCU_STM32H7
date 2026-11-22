@@ -67,7 +67,6 @@ extern MDMA_HandleTypeDef hmdma_mdma_channel0_sw_0;
 extern SD_HandleTypeDef hsd1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim4;
-extern TIM_HandleTypeDef htim8;
 extern TIM_HandleTypeDef htim13;
 extern DMA_HandleTypeDef hdma_usart2_tx;
 extern DMA_HandleTypeDef hdma_usart2_rx;
@@ -282,7 +281,6 @@ void TIM8_UP_TIM13_IRQHandler(void)
   /* USER CODE BEGIN TIM8_UP_TIM13_IRQn 0 */
 
   /* USER CODE END TIM8_UP_TIM13_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim8);
   HAL_TIM_IRQHandler(&htim13);
   /* USER CODE BEGIN TIM8_UP_TIM13_IRQn 1 */
 
