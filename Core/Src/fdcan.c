@@ -38,6 +38,7 @@
 #define TYPE_INT24            BIT4
 #define TYPE_INT32            BIT5
 #define TYPE_FLOAT            BIT6
+#define TYPE_DOUBLE           BIT7
 
 #define BMS1_MSG_INDEX        0
 #define BMS2_MSG_INDEX        1
@@ -77,9 +78,16 @@ typedef struct{
   CAN_Decoded_Values *decoded;
 }CAN_Decoded;
 
-static CAN_Decoded CAN_Storage[50];
-static uint8_t fdcan0_busy;
-static uint8_t fdcan1_busy;
+static D1_RAM CAN_Decoded CAN_Storage[50];
+static D1_RAM uint8_t fdcan0_busy;
+static D1_RAM uint8_t fdcan1_busy;
+static volatile uint32_t tx_dropped;
+
+static const CAN_Signal dbcID6B1[8] = {
+    {0.5f, .75f, 55.5f, 34.3f, 0, 8, BIG_ENDIAN | TYPE_FLOAT},
+};
+
+
 
 CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index);
 CAN_Decoded_Values* Get_Message(uint16_t id);
@@ -473,8 +481,9 @@ void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, ui
   }
 }
 
-/// @brief Stores decoded CAN message in CAN_Storage array
-/// @param msg Decoded CAN message
+/// @brief Stores a whole message to the CAN storage array
+/// @param msg The actual message used to find the id
+/// @param sig_count Amount of signals to 
 static void Store_Message(CAN_Decoded msg, uint8_t sig_count){
   uint8_t can_index;
   switch(msg.id){
@@ -494,21 +503,14 @@ static void Store_Message(CAN_Decoded msg, uint8_t sig_count){
 /// @brief Assigns signals to the message and should be called after recieving message 
 /// @param msg Pointer to CAN message
 DBC_Translation Assign_Signal(CAN_Msg_Raw *msg){
-    DBC_Translation dbc;
-
-    dbc.sig_count = 0;
-    dbc.signal = NULL;
+    DBC_Translation dbc = {.id = msg->id, 0};
 
     switch(msg->id){
-      case 10:
+      case 0x6b1:
+      dbc.id = msg->id;
       //implement actual dbc definition
-      CAN_Signal sig[] = {
-        {.start_bit = 0, .bit_length = 7, .min = 0, .max = 88, .offset = 0.5, .scale = 0.75, .type = 0}
-      };
-      
-      dbc.signal = sig;
-      dbc.sig_count = sizeof(sig)/sizeof(sig[0]);
-
+      dbc.signal = dbcID6B1;
+      dbc.sig_count = sizeof(dbcID6B1) / sizeof(CAN_Signal);
       return dbc;
       break;
 
@@ -535,24 +537,33 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
   translated_data = 0;
 
   for(uint8_t i = 0; i < 8; i++){
-    translated_data |= (msg.data[i]) << (i * 8);
+    translated_data |= (uint64_t)(msg.data[i]) << (i * 8);
   }
   
   for(uint8_t i =0; i < dbc.sig_count;i++ ){
     CAN_Signal *sig = &dbc.signal[i];
     uint8_t size;
+    uint64_t raw;
 
-    size = dbc.signal->bit_length;
-    //Signed + Big Endian
-    if(sig->type & SIGNED && sig->type & BIG_ENDIAN){
-      //worry about if there are big endian sigs
-    } 
-    //Signed + Little Endian
-    else if(sig->type & SIGNED && !(sig->type & BIG_ENDIAN)){
-      uint64_t raw;
+    size = sig->bit_length;
+
+    if(sig->type & BIG_ENDIAN){
+      uint64_t b_swap;
+      uint8_t msb;
+      uint8_t lsb;
+
+      b_swap = __builtin_bswap64(translated_data);
+      msb = (7 - sig->start_bit / 8) * 8 + (sig->start_bit % 8);
+      lsb = msb - (size - 1);
+      raw = extract_bits(b_swap,lsb,size);
+    }
+      else{
+      raw = extract_bits(translated_data, sig->start_bit, size);
+    }    
+    //Signed
+    if(sig->type & SIGNED){
       int64_t signed_raw;
 
-      raw = extract_bits(translated_data, sig->start_bit, size);
       signed_raw = (int64_t) raw;
       if(raw & (1ULL << (size - 1))){
         signed_raw -= (1ULL << size);
@@ -562,15 +573,38 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
         float decode;
 
         decode = (float)signed_raw;
-        decode *= sig->scale;
-        decode += sig->offset;
+        decode = decode * sig->scale + sig->offset;
+
+        if(!(sig->max == 0 && sig->min == 0)){
+          decode = (decode > sig->max) ? sig->max : decode;
+          decode = (decode < sig->min) ? sig->min : decode;
+        }
 
         values[i].flt = decode;
       }
-      else{
-        signed_raw *= sig->scale;
-        signed_raw += sig->offset;
+      else if(sig->type & TYPE_DOUBLE){
+        double decode;
 
+        decode = (double)signed_raw;
+        decode *= sig->scale;
+        decode += sig->offset;
+
+        if(!(sig->max == 0 && sig->min == 0)){
+
+        }
+        decode = (decode > sig->max) ? sig->max : decode;
+        decode = (decode < sig->min) ? sig->min : decode;
+
+        values[i].dub = decode;
+
+      }
+      else{
+        signed_raw = signed_raw * sig->scale + sig->offset;
+
+        if(!(sig->max == 0 && sig->min == 0)){
+          signed_raw = (signed_raw > sig->max) ? sig->max : signed_raw;
+          signed_raw = (signed_raw < sig->min) ? sig->min : signed_raw;
+        }  
         if(sig->type & TYPE_INT8){
           values[i].int8 = (int8_t) signed_raw;
           
@@ -586,45 +620,53 @@ void Decode_Message(CAN_Msg_Raw msg, DBC_Translation dbc){
 }
       }
     }   
-    //Unsigned + Big Endian
-    else if(!(sig->type & SIGNED) && sig->type & BIG_ENDIAN){
-      //worry about if there are big endian sigs
-    } 
-    //Unsigned + Little Endian
-    else if(!(sig->type & SIGNED) && !(sig->type & BIG_ENDIAN)){
+
+    //Unsigned
+    else if(!(sig->type & SIGNED)){
+
       if(sig->type & TYPE_FLOAT){
         float decode;
 
-        decode = (float)extract_bits(translated_data,sig->start_bit,size);
-        decode *= sig->scale;
-        decode += sig->offset;
-        values[i].flt = decode;
+        decode = (float)raw;
+        decode =decode * sig->scale + sig->offset;
+
+        if(!(sig->max == 0 && sig->min == 0)){
+        decode = (decode > sig->max) ? sig->max : decode;
+        decode = (decode < sig->min) ? sig->min : decode;
+        }
+        values[i].flt = decode; 
+      }
+      else if(sig->type & TYPE_DOUBLE){
+        double decode;
+
+        decode = (double)raw;
+        decode = decode * sig->scale + sig->offset;
+
+        if(!(sig->max == 0 && sig->min == 0)){
+          decode = (decode > sig->max) ? sig->max : decode;
+          decode = (decode < sig->min) ? sig->min : decode;
+        }
+        values[i].dub = decode; 
       }
       else{
-        uint64_t decode;
+        raw = raw * sig->scale + sig->offset;
 
-        decode = extract_bits(translated_data, sig->start_bit, size);
-        decode *= sig->scale;
-        decode += sig->offset;
-
-        if(decode > sig->max){
-          decode = sig->max;
-        }
-        else if(decode < sig->min){
-          decode = sig->min;
+        if(!(sig->max == 0 && sig->min == 0)){
+          raw = (raw > sig->max) ? sig->max : raw;
+          raw = (raw < sig->min) ? sig->min : raw;
         }
 
         if(sig->type & TYPE_INT8){
-          values[i].uint8 = (uint8_t) decode;
+          values[i].uint8 = (uint8_t) raw;
         }
         else if(sig->type & TYPE_INT16){
-          values[i].uint16 = (uint16_t) decode;
+          values[i].uint16 = (uint16_t) raw;
         }
         else if(sig->type & TYPE_INT24){
-          values[i].uint24 = (uint32_t) decode;
+          values[i].uint24 = (uint32_t) raw;
         }
         else if(sig->type & TYPE_INT32){
-          values[i].uint32 = (uint32_t) decode;
+          values[i].uint32 = (uint32_t) raw;
         }
       }
     }
@@ -640,6 +682,7 @@ CAN_Decoded_Values Get_Signal(uint16_t id, uint8_t index){
   switch(id){
     case 0x6B1:
       ret = CAN_Storage[BMS1_MSG_INDEX].decoded[index];
+      break;
 
     default:
       ret.int8 = 0;
@@ -658,6 +701,7 @@ CAN_Decoded_Values* Get_Message(uint16_t id){
     default:
       ret[0].uint8 = 6;
       ret[1].uint8 = 7;
+      ret = NULL;
   }
   return ret;
 }

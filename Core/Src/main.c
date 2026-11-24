@@ -245,14 +245,12 @@ void SystemClock_Config(void)
 /// @param size number of bits that are going to be extracted
 /// @return Desired bits
 uint64_t extract_bits(uint64_t data, uint8_t start_bit, uint8_t size){
-  if(size > 64 || size == 0){
+  if(size == 0 || size > 64 || start_bit > 63 || (start_bit + size) > 64){
     return 0;
   }
 
-  uint64_t mask;
-
-  mask = (1ULL << size) - 1;
-  return ((data >> start_bit) & mask);
+  uint64_t mask = (size == 64) ? UINT64_MAX : ((1ULL << size) - 1);
+  return (data >> start_bit) & mask;
 }
 
 /* USER CODE END 4 */
