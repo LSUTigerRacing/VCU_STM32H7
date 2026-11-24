@@ -57,28 +57,29 @@ typedef union{
   uint32_t uint32;
   int32_t int32;
   float flt;
+  double dub;
 }CAN_Decoded_Values;
 
 typedef struct{
-  uint8_t start_bit;
-  uint8_t bit_length;
   float scale;
-  int16_t offset;
+  float offset;
   float min;
   float max;
+  uint8_t start_bit;
+  uint8_t bit_length;
   uint8_t type;
 }CAN_Signal;
 
 typedef struct{
+  const CAN_Signal *signal;
   uint16_t id;
   uint8_t sig_count;
-  CAN_Signal *signal;
 } DBC_Translation;
 
 typedef struct{
+  uint8_t data[8];
   uint16_t id;
   uint8_t dlc;
-  uint8_t data[8];
 } CAN_Msg_Raw;
 
 extern void Prepare_Message(FDCAN_HandleTypeDef *hfdcan, uint32_t id, uint8_t *data, uint8_t dlc);
