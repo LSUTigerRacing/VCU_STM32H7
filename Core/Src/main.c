@@ -117,7 +117,6 @@ int main(void)
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM4_Init();
-  MX_TIM5_Init();
   MX_TIM15_Init();
   MX_RAMECC_Init();
   MX_USART2_UART_Init();
@@ -125,23 +124,24 @@ int main(void)
   MX_ADC3_Init();
   MX_TIM12_Init();
   MX_DAC1_Init();
-  MX_TIM3_Init();
   MX_TIM13_Init();
   MX_TIM14_Init();
   MX_FATFS_Init();
   MX_RTC_Init();
   MX_OCTOSPI1_Init();
-  MX_RTC_Init();
+  MX_TIM23_Init();
+  MX_TIM24_Init();
+  MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
 
   //startup info
 
   //Lamp check (E.V. 6.3) page 101
-  HAL_GPIO_WritePin(GPIOA, 9, GPIO_PIN_SET); //Highside driver for the lights
+  HAL_GPIO_WritePin(GPIOA, DigOut_2_Pin, GPIO_PIN_SET); //Highside driver for the lights
   HAL_Delay(2500);
-  HAL_GPIO_WritePin(GPIOA, 9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, DigOut_2_Pin, GPIO_PIN_RESET);
 
-  HAL_GPIO_WritePin(GPIOE, 1, GPIO_PIN_SET); //Power for fault latch
+  HAL_GPIO_WritePin(GPIOC, DigOut_4_Pin, GPIO_PIN_SET); //Power for fault latch
   HAL_Delay(5000); //wait for 5 seconds
 
   //get bms_fault
@@ -154,6 +154,14 @@ int main(void)
   SEGGER_RTT_Init();
   SEGGER_SYSVIEW_Conf();
   MX_SDMMC1_SD_Init();
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_1); //fl ws
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_2); //fr ws
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_3); //rl ws
+  HAL_TIM_IC_Start_IT(&htim4, TIM_CHANNEL_4); //rr ws
+  //flowrate timer
+  __HAL_TIM_URS_ENABLE(&htim5);                 
+  __HAL_TIM_CLEAR_FLAG(&htim5, TIM_FLAG_UPDATE);
+  HAL_TIM_IC_Start(&htim5, TIM_CHANNEL_1);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -286,7 +294,7 @@ void MPU_Config(void)
 
 /**
   * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM6 interrupt took place, inside
+  * @note   This function is called  when TIM17 interrupt took place, inside
   * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
   * a global variable "uwTick" used as application time base.
   * @param  htim : TIM handle
@@ -297,7 +305,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM6)
+  if (htim->Instance == TIM17)
   {
     HAL_IncTick();
   }

@@ -66,7 +66,11 @@ extern FDCAN_HandleTypeDef hfdcan2;
 extern MDMA_HandleTypeDef hmdma_mdma_channel0_sw_0;
 extern SD_HandleTypeDef hsd1;
 extern TIM_HandleTypeDef htim2;
-extern TIM_HandleTypeDef htim6;
+extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim13;
+extern DMA_HandleTypeDef hdma_usart2_tx;
+extern DMA_HandleTypeDef hdma_usart2_rx;
+extern TIM_HandleTypeDef htim17;
 
 /* USER CODE BEGIN EV */
 
@@ -256,6 +260,34 @@ void TIM2_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles TIM4 global interrupt.
+  */
+void TIM4_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM4_IRQn 0 */
+
+  /* USER CODE END TIM4_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim4);
+  /* USER CODE BEGIN TIM4_IRQn 1 */
+
+  /* USER CODE END TIM4_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM8 update interrupt and TIM13 global interrupt.
+  */
+void TIM8_UP_TIM13_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM8_UP_TIM13_IRQn 0 */
+
+  /* USER CODE END TIM8_UP_TIM13_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim13);
+  /* USER CODE BEGIN TIM8_UP_TIM13_IRQn 1 */
+
+  /* USER CODE END TIM8_UP_TIM13_IRQn 1 */
+}
+
+/**
   * @brief This function handles SDMMC1 global interrupt.
   */
 void SDMMC1_IRQHandler(void)
@@ -277,13 +309,52 @@ void TIM6_DAC_IRQHandler(void)
   /* USER CODE BEGIN TIM6_DAC_IRQn 0 */
 
   /* USER CODE END TIM6_DAC_IRQn 0 */
-  if (hdac1.State != HAL_DAC_STATE_RESET) {
-    HAL_DAC_IRQHandler(&hdac1);
-  }
-  HAL_TIM_IRQHandler(&htim6);
+  HAL_DAC_IRQHandler(&hdac1);
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
 
   /* USER CODE END TIM6_DAC_IRQn 1 */
+}
+
+/**
+  * @brief This function handles DMA2 stream0 global interrupt.
+  */
+void DMA2_Stream0_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA2_Stream0_IRQn 0 */
+
+  /* USER CODE END DMA2_Stream0_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_usart2_tx);
+  /* USER CODE BEGIN DMA2_Stream0_IRQn 1 */
+
+  /* USER CODE END DMA2_Stream0_IRQn 1 */
+}
+
+/**
+  * @brief This function handles DMA2 stream1 global interrupt.
+  */
+void DMA2_Stream1_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA2_Stream1_IRQn 0 */
+
+  /* USER CODE END DMA2_Stream1_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_usart2_rx);
+  /* USER CODE BEGIN DMA2_Stream1_IRQn 1 */
+
+  /* USER CODE END DMA2_Stream1_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM17 global interrupt.
+  */
+void TIM17_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM17_IRQn 0 */
+
+  /* USER CODE END TIM17_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim17);
+  /* USER CODE BEGIN TIM17_IRQn 1 */
+
+  /* USER CODE END TIM17_IRQn 1 */
 }
 
 /**

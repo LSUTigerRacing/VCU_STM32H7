@@ -63,7 +63,34 @@ typedef struct {
   
   uint32_t f_brake_press;
   uint32_t b_brake_press;
+
+  CAN_Decoded_Values BMS_1;
+  CAN_Decoded_Values BMS_2;
+
+  CAN_Decoded_Values DTI_1;
+  CAN_Decoded_Values DTI_2;
+  CAN_Decoded_Values DTI_3;
+  CAN_Decoded_Values DTI_4;
+  CAN_Decoded_Values DTI_5;
+
+  CAN_Decoded_Values COOL_IN;
+  CAN_Decoded_Values COOL_OUT;
+  CAN_Decoded_Values COOL_FLOW;
+
+  CAN_Decoded_Values BRAKE_PSI;
+
+  CAN_Decoded_Values WHEEL1;
+  CAN_Decoded_Values WHEEL2;
+
+  CAN_Decoded_Values ROTOR1;
+  CAN_Decoded_Values ROTOR2;
 } TelemetryData_t;
+
+typedef enum{
+  Eco,
+  Normal,
+  Sport
+}Powermodes;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -78,6 +105,7 @@ typedef struct {
 #define RTD_ON                BIT0
 #define RTD_BUZZ              BIT1
 #define RTD_BUTT              BIT2
+#define RTD_FAULT             BIT3
 #define MC_MAX_OUTPUT         500
 /* USER CODE END PM */
 
@@ -93,20 +121,14 @@ volatile D3_RAM uint16_t adc3_dma_buf[ADC3_BUFFER_COUNT];
 volatile uint32_t test_reading;
 volatile uint32_t pump_speed;
 
-D1_RAM char sd_write_buffer[256] __attribute((aligned(32)));
+D1_RAM char sd_write_buffer[512] __attribute((aligned(32)));
 
 D1_RAM FIL LogFile;
-
-typedef enum{
-  Eco,
-  Normal,
-  Sport
-}Powermodes;
 
 static volatile Powermodes power;
 
 //sigmoid function
-static uint16_t throttle_curve[11] = {
+static const uint16_t throttle_curve[11] = {
 0, 302, 519, 707, 881, 1050, 1219, 1393, 1581, 1798, 2100
 };
 
@@ -240,6 +262,18 @@ const osThreadAttr_t RTDOn_attributes = {
   .stack_size = sizeof(RTDOnBuffer),
   .priority = (osPriority_t) osPriorityRealtime5,
 };
+/* Definitions for TelemLog */
+osThreadId_t TelemLogHandle;
+uint32_t TelemLogBuffer[ 256 ];
+osStaticThreadDef_t TelemLogControlBlock;
+const osThreadAttr_t TelemLog_attributes = {
+  .name = "TelemLog",
+  .cb_mem = &TelemLogControlBlock,
+  .cb_size = sizeof(TelemLogControlBlock),
+  .stack_mem = &TelemLogBuffer[0],
+  .stack_size = sizeof(TelemLogBuffer),
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for CAN1rxQ */
 osMessageQueueId_t CAN1rxQHandle;
 uint8_t CAN1rxQBuffer[ 16 * sizeof( CAN_Msg_Raw ) ];
@@ -284,16 +318,27 @@ const osMessageQueueAttr_t CAN2txQ_attributes = {
   .mq_mem = &CAN2txQBuffer,
   .mq_size = sizeof(CAN2txQBuffer)
 };
-/* Definitions for LogQ */
-osMessageQueueId_t LogQHandle;
-uint8_t LogQBuffer[ 512 * sizeof( TelemetryData_t ) ];
-osStaticMessageQDef_t LogQControlBlock;
-const osMessageQueueAttr_t LogQ_attributes = {
-  .name = "LogQ",
-  .cb_mem = &LogQControlBlock,
-  .cb_size = sizeof(LogQControlBlock),
-  .mq_mem = &LogQBuffer,
-  .mq_size = sizeof(LogQBuffer)
+/* Definitions for ADCLogQ */
+osMessageQueueId_t ADCLogQHandle;
+uint8_t ADCLogQBuffer[ 64 * sizeof( TelemetryData_t ) ];
+osStaticMessageQDef_t ADCLogQControlBlock;
+const osMessageQueueAttr_t ADCLogQ_attributes = {
+  .name = "ADCLogQ",
+  .cb_mem = &ADCLogQControlBlock,
+  .cb_size = sizeof(ADCLogQControlBlock),
+  .mq_mem = &ADCLogQBuffer,
+  .mq_size = sizeof(ADCLogQBuffer)
+};
+/* Definitions for CANLogQ */
+osMessageQueueId_t CANLogQHandle;
+uint8_t CANLogQBuffer[ 16 * sizeof( TelemetryData_t ) ];
+osStaticMessageQDef_t CANLogQControlBlock;
+const osMessageQueueAttr_t CANLogQ_attributes = {
+  .name = "CANLogQ",
+  .cb_mem = &CANLogQControlBlock,
+  .cb_size = sizeof(CANLogQControlBlock),
+  .mq_mem = &CANLogQBuffer,
+  .mq_size = sizeof(CANLogQBuffer)
 };
 /* Definitions for CAN1txM */
 osMutexId_t CAN1txMHandle;
@@ -303,14 +348,6 @@ const osMutexAttr_t CAN1txM_attributes = {
   .cb_mem = &CAN1txMControlBlock,
   .cb_size = sizeof(CAN1txMControlBlock),
 };
-/* Definitions for CAN1rxM */
-osMutexId_t CAN1rxMHandle;
-osStaticMutexDef_t CAN1rxMControlBlock;
-const osMutexAttr_t CAN1rxM_attributes = {
-  .name = "CAN1rxM",
-  .cb_mem = &CAN1rxMControlBlock,
-  .cb_size = sizeof(CAN1rxMControlBlock),
-};
 /* Definitions for CAN2txM */
 osMutexId_t CAN2txMHandle;
 osStaticMutexDef_t CAN2txMControlBlock;
@@ -318,14 +355,6 @@ const osMutexAttr_t CAN2txM_attributes = {
   .name = "CAN2txM",
   .cb_mem = &CAN2txMControlBlock,
   .cb_size = sizeof(CAN2txMControlBlock),
-};
-/* Definitions for CAN2rxM */
-osMutexId_t CAN2rxMHandle;
-osStaticMutexDef_t CAN2rxMControlBlock;
-const osMutexAttr_t CAN2rxM_attributes = {
-  .name = "CAN2rxM",
-  .cb_mem = &CAN2rxMControlBlock,
-  .cb_size = sizeof(CAN2rxMControlBlock),
 };
 /* Definitions for CAN1rxS */
 osSemaphoreId_t CAN1rxSHandle;
@@ -392,6 +421,7 @@ void StartLoggingTask(void *argument);
 void StartTaskGPIO(void *argument);
 void StartRTDSM(void *argument);
 void StartRTDOn(void *argument);
+void StartTelemLog(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -408,14 +438,8 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN1txM */
   CAN1txMHandle = osMutexNew(&CAN1txM_attributes);
 
-  /* creation of CAN1rxM */
-  CAN1rxMHandle = osMutexNew(&CAN1rxM_attributes);
-
   /* creation of CAN2txM */
   CAN2txMHandle = osMutexNew(&CAN2txM_attributes);
-
-  /* creation of CAN2rxM */
-  CAN2rxMHandle = osMutexNew(&CAN2rxM_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -456,8 +480,11 @@ void MX_FREERTOS_Init(void) {
   /* creation of CAN2txQ */
   CAN2txQHandle = osMessageQueueNew (16, sizeof(CAN_Msg_Raw), &CAN2txQ_attributes);
 
-  /* creation of LogQ */
-  LogQHandle = osMessageQueueNew (512, sizeof(TelemetryData_t), &LogQ_attributes);
+  /* creation of ADCLogQ */
+  ADCLogQHandle = osMessageQueueNew (64, sizeof(TelemetryData_t), &ADCLogQ_attributes);
+
+  /* creation of CANLogQ */
+  CANLogQHandle = osMessageQueueNew (16, sizeof(TelemetryData_t), &CANLogQ_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -496,6 +523,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of RTDOn */
   RTDOnHandle = osThreadNew(StartRTDOn, NULL, &RTDOn_attributes);
+
+  /* creation of TelemLog */
+  TelemLogHandle = osThreadNew(StartTelemLog, NULL, &TelemLog_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -549,8 +579,9 @@ void StartADCTask(void *argument)
 
   HAL_TIM_Base_Start(&htim1);
 
+  TelemetryData_t adcData;
+
   uint8_t can_data[8] = {0};
-  TelemetryData_t currentData;
   uint8_t perc = 0;
   /* Infinite loop */
   for(;;)
@@ -568,25 +599,34 @@ void StartADCTask(void *argument)
     throttle_pos.avg = (throttle_pos.data1 + throttle_pos.data2) / 2;
     apps2.avg = apps2.data1;
 
-    if(throttle_pos.avg >= throttle_curve[10]){
-      perc = 100;
-    }
-    else if(throttle_pos.avg <= throttle_curve[0]){
-      perc = 0;
-    }
-    else{
-      for(uint8_t i = 1; i < 10; i++){
-        if(throttle_pos.avg <= throttle_curve[i]){
-          //left side of the equation finds the tens position of the percentage while the right finds the ones position
-          perc = ((i - 1) * 10) + ((throttle_pos.avg - throttle_curve[i-1]) / (throttle_curve[i] - throttle_curve[i-1])); 
+  //APPS check
+  uint32_t high = (throttle_pos.avg > apps2.avg) ? throttle_pos.data1 : apps2.avg;
+  uint32_t low = (throttle_pos.avg > apps2.avg) ? apps2.avg : throttle_pos.avg;
+  uint64_t diff= high - low;
+    if(osEventFlagsGet(RTDHandle) & RTD_ON && !(diff * 10 > high)){
+      if(throttle_pos.avg >= throttle_curve[10]){
+        perc = 100;
+      }
+      else if(throttle_pos.avg <= throttle_curve[0]){
+        perc = 0;
+      }
+      else{
+        for(uint8_t i = 1; i < 10; i++){
+          if(throttle_pos.avg <= throttle_curve[i]){
+            //left side of the equation finds the tens position of the percentage while the right finds the ones position
+            perc = ((i - 1) * 10) + ((throttle_pos.avg - throttle_curve[i-1]) / (throttle_curve[i] - throttle_curve[i-1])); 
+          }
         }
       }
-    }
-    perc *= 10;
-    can_data[0] = (uint8_t) (perc & 0xFF);
-    can_data[1] = (uint8_t) ((perc >> 8) & 0xFF);
+      perc = ((uint8_t) (perc * Traction_Control())) * 10 ;
+      can_data[0] = (uint8_t) (perc & 0xFF);
+      can_data[1] = (uint8_t) ((perc >> 8) & 0xFF);
 
-    Prepare_Message(&hfdcan1, 0x05, can_data, 2); //for relative output current (find real id)
+      Prepare_Message(&hfdcan1, 0x05, can_data, 2); //for relative output current (find real id)
+  }
+  else{
+    osEventFlagsSet(RTDHandle, RTD_FAULT);
+  }
 
     inlet_temp.avg = (inlet_temp.data1 + inlet_temp.data2) / 2;
     outlet_temp.avg = (outlet_temp.data1 + outlet_temp.data2) / 2;
@@ -594,35 +634,40 @@ void StartADCTask(void *argument)
     f_brake_press.avg = (f_brake_press.data1 + f_brake_press.data2) / 2;
     b_brake_press.avg = (b_brake_press.data1 + b_brake_press.data2) / 2;
 
+  //BSPD check
+  if(throttle_pos.avg>= HARD_ACCEL && b_brake_press.avg>= HARD_BRAKE){
+    osEventFlagsSet(RTDHandle, RTD_FAULT);
+  }
+
     //put actual brake light pin
     if((f_brake_press.avg + b_brake_press.avg)/2 >= BRAKE_ON){
-      HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(GPIOA, DigOut_3_Pin, GPIO_PIN_SET);
     }
     else{
-      HAL_GPIO_WritePin(GPIOA, 8, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOA, DigOut_3_Pin, GPIO_PIN_RESET);
     }
     
-    currentData.timestamp = HAL_GetTick();
+    adcData.timestamp = HAL_GetTick();
 
-    currentData.sus_fl = sus_fl.avg;
-    currentData.sus_fr = sus_fr.avg;
-    currentData.sus_bl = sus_bl.avg;
-    currentData.sus_br = sus_br.avg;
+    adcData.sus_fl = sus_fl.avg;
+    adcData.sus_fr = sus_fr.avg;
+    adcData.sus_bl = sus_bl.avg;
+    adcData.sus_br = sus_br.avg;
 
-    currentData.throttle_pos = throttle_pos.avg;
-    currentData.apps2 =  apps2.avg;
+    adcData.throttle_pos = throttle_pos.avg;
+    adcData.apps2 =  apps2.avg;
 
-    currentData.steering_ang = steering_ang.avg;
+    adcData.steering_ang = steering_ang.avg;
 
-    currentData.inlet_temp = inlet_temp.avg;
-    currentData.outlet_temp = outlet_temp.avg;
+    adcData.inlet_temp = inlet_temp.avg;
+    adcData.outlet_temp = outlet_temp.avg;
 
-    currentData.f_brake_press = f_brake_press.avg;
-    currentData.b_brake_press = b_brake_press.avg;
+    adcData.f_brake_press = f_brake_press.avg;
+    adcData.b_brake_press = b_brake_press.avg;
 
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-    osMessageQueuePut(LogQHandle, &currentData, 0, 0);
+    osMessageQueuePut(ADCLogQHandle, &adcData, 0, osWaitForever);
   }
   /* USER CODE END StartADCTask */
 }
@@ -774,12 +819,17 @@ void StartLoggingTask(void *argument)
 {
   /* USER CODE BEGIN StartLoggingTask */
   UINT bytesWritten;
-  TelemetryData_t rxData;
+  TelemetryData_t ADCData;
+  TelemetryData_t CANData;
   RTC_TimeTypeDef time;
   RTC_DateTypeDef date;
   static char dirName[16];
   static char fileName[32];
   static uint8_t done = 0;
+  uint8_t writeCtr = 0;
+
+  // temporary
+  TelemetryData_t temp;
 
   HAL_RTC_GetTime(&hrtc, &time, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(&hrtc, &date, RTC_FORMAT_BIN);
@@ -805,30 +855,72 @@ void StartLoggingTask(void *argument)
     if (i == 1000) break;
   }
 
-  int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "TIME, SUSPENSION FL, SUSPENSION FR, SUSPENSION BL, SUSPENSION BR, THROTTLE POSITION, APPS2, STEERING ANGLE, INLET TEMPERATURE, OUTLET TEMPERATURE, FRONT BRAKE PRESSURE, BACK BRAKE PRESSURE\n");
+  int len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), 
+  "TIME, SUSPENSION FL, SUSPENSION FR, SUSPENSION BL, SUSPENSION BR, THROTTLE POSITION, APPS2, STEERING ANGLE, INLET TEMPERATURE, OUTLET TEMPERATURE, FRONT BRAKE PRESSURE, BACK BRAKE PRESSURE, BMS 1, BMS 2, DTI 1, DTI 2, DTI 3, DTI 4, DTI 5, COOLANT IN, COOLANT OUT, COOLANT FLOW, BRAKE PSI, WHEEL1, WHEEL2, ROTOR1, ROTOR2\n");
   f_write(&LogFile, &sd_write_buffer, len, &bytesWritten);
   /* Infinite loop */
   for(;;)
   {
+    // replace all id's and indices as necessary
+    temp.BMS_1 = Get_Signal(0x6B1, 0);
+    temp.BMS_2 = Get_Signal(0x6B1, 1);
+    temp.DTI_1 = Get_Signal(0x6B1, 0);
+    temp.DTI_2 = Get_Signal(0x6B1, 1);
+    temp.DTI_3 = Get_Signal(0x6B1, 2);
+    temp.DTI_4 = Get_Signal(0x6B1, 3);
+    temp.DTI_5 = Get_Signal(0x6B1, 4);
+    temp.COOL_IN = Get_Signal(0x6B1, 0);
+    temp.COOL_OUT = Get_Signal(0x6B1, 0);
+    temp.COOL_FLOW = Get_Signal(0x6B1, 0);
+    temp.BRAKE_PSI = Get_Signal(0x6B1, 0);
+    temp.WHEEL1 = Get_Signal(0x6B1, 0);
+    temp.WHEEL2 = Get_Signal(0x6B1, 0);
+    temp.ROTOR1 = Get_Signal(0x6B1, 0);
+    temp.ROTOR2 = Get_Signal(0x6B1, 0);
 
-    if (osMessageQueueGet(LogQHandle, &rxData, NULL, osWaitForever) == osOK) {
-      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", 
-      rxData.timestamp,
-      rxData.sus_fl,
-      rxData.sus_fr,
-      rxData.sus_bl,
-      rxData.sus_br,
-      rxData.throttle_pos,
-      rxData.apps2,
-      rxData.steering_ang,
-      rxData.inlet_temp,
-      rxData.outlet_temp,
-      rxData.f_brake_press,
-      rxData.b_brake_press
+    temp.BMS_1.uint32 =  500;
+
+    osMessageQueuePut(CANLogQHandle, &temp, 0, osWaitForever);
+
+    writeCtr++;
+    if (osMessageQueueGet(ADCLogQHandle, &ADCData, NULL, osWaitForever) == osOK && osMessageQueueGet(CANLogQHandle, &CANData, NULL, osWaitForever) == osOK) {
+      len = snprintf(sd_write_buffer, sizeof(sd_write_buffer), "%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu,%lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu\n", 
+      ADCData.timestamp,
+      ADCData.sus_fl,
+      ADCData.sus_fr,
+      ADCData.sus_bl,
+      ADCData.sus_br,
+      ADCData.throttle_pos,
+      ADCData.apps2,
+      ADCData.steering_ang,
+      ADCData.inlet_temp,
+      ADCData.outlet_temp,
+      ADCData.f_brake_press,
+      ADCData.b_brake_press,
+      CANData.BMS_1.uint32,
+      CANData.BMS_2.uint32,
+      CANData.DTI_1.uint32,
+      CANData.DTI_2.uint32,
+      CANData.DTI_3.uint32,
+      CANData.DTI_4.uint32,
+      CANData.DTI_5.uint32,
+      CANData.COOL_IN.uint32,
+      CANData.COOL_OUT.uint32,
+      CANData.COOL_FLOW.uint32,
+      CANData.BRAKE_PSI.uint32,
+      CANData.WHEEL1.uint32,
+      CANData.WHEEL2.uint32,
+      CANData.ROTOR1.uint32,
+      CANData.ROTOR2.uint32
     );
-      if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK){
-        fRes = f_sync(&LogFile);
+
+      if (f_write(&LogFile, &sd_write_buffer, len, &bytesWritten) == FR_OK) {
+        if (writeCtr == 50) {
+          fRes = f_sync(&LogFile);
+          writeCtr = 0;
+        }
       }
+
     }
 
     osDelay(1);
@@ -906,7 +998,7 @@ void StartTaskGPIO(void *argument)
 
     if ((uxBits & BTN_RTD) !=0) {
       //pin not confirmed
-      if(HAL_GPIO_ReadPin(GPIOE,1)){
+      if(HAL_GPIO_ReadPin(GPIOE,GPIO_PIN_1)){
         osEventFlagsSet(RTDHandle, RTD_BUTT); 
       }
       else{
@@ -942,18 +1034,19 @@ void StartRTDSM(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osEventFlagsWait(RTDHandle,RTD_ON | RTD_BUZZ, osFlagsWaitAny, osWaitForever);
+    osEventFlagsWait(RTDHandle, RTD_BUZZ | RTD_FAULT, osFlagsWaitAny, osWaitForever);
     flags = osEventFlagsGet(RTDHandle);
-    if(!(flags & RTD_ON)){
-      //CAN message to turn on motor controller
-      can_data[3] = 1;
+    if(flags & RTD_FAULT){
+      //CAN id for drive enable
+      can_data[3] = 1; //turn off motor controller
       Prepare_Message(&hfdcan1,0x24,can_data,8); 
+      osEventFlagsClear(RTDHandle, RTD_ON);
     }
     else if(flags & RTD_BUZZ){
       // turn buzzer on for 1 second
-      HAL_GPIO_WritePin(GPIOA,10, GPIO_PIN_SET); //put actual buzzer pin when done implementing
+      HAL_GPIO_WritePin(GPIOA,DigOut_1_Pin, GPIO_PIN_SET); //put actual buzzer pin when done implementing
       osDelay(1000);
-      HAL_GPIO_WritePin(GPIOA,10,GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(GPIOA,DigOut_1_Pin,GPIO_PIN_RESET);
       osEventFlagsClear(RTDHandle, RTD_BUZZ);
 
       can_data[3] = 0;
@@ -987,6 +1080,24 @@ void StartRTDOn(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartRTDOn */
+}
+
+/* USER CODE BEGIN Header_StartTelemLog */
+/**
+* @brief Function implementing the TelemLog thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTelemLog */
+void StartTelemLog(void *argument)
+{
+  /* USER CODE BEGIN StartTelemLog */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTelemLog */
 }
 
 /* Private application code --------------------------------------------------*/

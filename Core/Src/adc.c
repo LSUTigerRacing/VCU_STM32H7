@@ -30,6 +30,7 @@ extern osEventFlagsId_t RTDHandle;
 /* BEGIN Defines*/
 #define RTD_ON     BIT0
 #define RTD_BUZZER BIT1
+#define RTD_FAULT  BIT3
 /* END Defines*/
 
 /* BEGIN Globals*/
@@ -44,6 +45,7 @@ volatile ADC_Data steering_ang;
 
 // Throttle pedal position
 volatile ADC_Data throttle_pos;
+volatile ADC_Data app2;
 
 // Apps 2
 volatile ADC_Data apps2;
@@ -90,7 +92,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
 
     b_brake_press.data1 = adc12_dma_buf[B_BRAKE] & 0xFFFF; 
     b_brake_press.data2 = adc12_dma_buf[B_BRAKE] >> 16;
-
   }
 
   if (hadc->Instance == ADC3) {
@@ -98,10 +99,18 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc) {
     apps2.data2 = apps2.data1;
   }
 
-  //BSPD check
-  if( (throttle_pos.data1 + throttle_pos.data2)>= HARD_ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
-    osEventFlagsClear(RTDHandle, RTD_ON);
-  }
+  // //BSPD check
+  // if( (throttle_pos.data1 + throttle_pos.data2)>= HARD_ACCEL && (b_brake_press.data1 + b_brake_press.data2) >= HARD_BRAKE){
+  //   osEventFlagsSet(RTDHandle, RTD_FAULT);
+  // }
+
+  // //APPS check
+  // uint32_t high = (apps2.data1 > app2.data1) ? throttle_pos.data1 : app2.data1;
+  // uint32_t low = (throttle_pos.data1 > app2.data1) ? app2.data1 : throttle_pos.data1;
+  // uint64_t diff= high - low;
+  // if(diff * 10 > high){
+  //   osEventFlagsSet(RTDHandle,RTD_FAULT);
+  // }
 
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
   vTaskNotifyGiveFromISR(ADCTaskHandle, &xHigherPriorityTaskWoken);
@@ -482,7 +491,6 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     /**ADC1 GPIO Configuration
     PC1     ------> ADC1_INP11
-    PA1     ------> ADC1_INP17
     PA2     ------> ADC1_INP14
     PA3     ------> ADC1_INP15
     PA5     ------> ADC1_INP19
@@ -498,8 +506,8 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = GPIO_PIN_1|OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin
-                          |SUSPENSION_FL_Pin|SUSPENSION_BR_Pin;
+    GPIO_InitStruct.Pin = OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin|SUSPENSION_FL_Pin
+                          |SUSPENSION_BR_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_PULLDOWN;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -669,7 +677,6 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
 
     /**ADC1 GPIO Configuration
     PC1     ------> ADC1_INP11
-    PA1     ------> ADC1_INP17
     PA2     ------> ADC1_INP14
     PA3     ------> ADC1_INP15
     PA5     ------> ADC1_INP19
@@ -682,8 +689,8 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
     */
     HAL_GPIO_DeInit(GPIOC, INLET_TEMPERATURE_Pin|SUSPENSION_FR_Pin|STEERING_ANGLE_Pin);
 
-    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_1|OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin
-                          |SUSPENSION_FL_Pin|SUSPENSION_BR_Pin);
+    HAL_GPIO_DeInit(GPIOA, OUTLET_TEMPERATURE_Pin|FRONT_BRAKE_PRESSURE_Pin|BACK_BRAKE_PRESSURE_Pin|SUSPENSION_FL_Pin
+                          |SUSPENSION_BR_Pin);
 
     HAL_GPIO_DeInit(GPIOB, THROTTLE_PEDAL_POSITION_Pin|SUSPENSION_BL_Pin);
 
